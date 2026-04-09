@@ -1,0 +1,39 @@
+import { create } from 'zustand';
+
+export interface Project {
+  _id: string;
+  title: string;
+  location: string;
+  replicationsCount: number;
+  treatmentsCount: number;
+  userId: string;
+  plotsCount: number;
+  createdAt: string;
+  updatedAt: string;
+  plotColors: string[];
+  notesCount: number;
+}
+
+export interface ProjectAction {
+  isProjectAdding: boolean;
+}
+
+export interface ProjectsState {
+  projectsData: Project[];
+  setProjectsData: (projects: Project[]) => void;
+}
+
+export interface ProjectsActionState {
+  isProjectAdding: boolean;
+  setIsProjectAdding: (isAdding: boolean) => void;
+}
+
+export const useProjectsStore = create<ProjectsState>(set => ({
+  projectsData: [],
+  setProjectsData: projects => set({ projectsData: projects }),
+}));
+
+export const useProjectsActionStore = create<ProjectsActionState>(set => ({
+  isProjectAdding: false,
+  setIsProjectAdding: isAdding => set({ isProjectAdding: isAdding }),
+}));

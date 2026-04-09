@@ -1,0 +1,98 @@
+import {
+  View,
+  Text,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import React, { useLayoutEffect, useState } from 'react';
+import { H3, Screen } from '../../../../../components/commonStyles/styles';
+import { Grid3x3 } from 'lucide-react-native/icons';
+import { Theme } from '../../../../../components/theme';
+import Input from '../../../../../components/Input';
+import Button from '../../../../../components/Button';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
+import { useStackScreenStore } from '../../../../../services/StackScreen/stackScreen.store';
+
+const ProjectTitle = () => {
+  const router = useNavigation<NavigationProp<any>>();
+  const setHeader = useStackScreenStore(state => state.setHeader);
+  const resetHeader = useStackScreenStore(state => state.resetHeader);
+  const projectTitleFromStore = useAddNewProjectStore(state => state.title);
+
+  const [projectTitle, setProjectTitle] = useState<string>(
+    projectTitleFromStore || '',
+  );
+
+  const setAddNewProjectTitle = useAddNewProjectStore(state => state.setTitle);
+  const errorStatus = useAddNewProjectStore(state => state.errorStatus);
+
+  React.useEffect(() => {
+    setAddNewProjectTitle(projectTitle);
+  }, [projectTitle]);
+
+  useLayoutEffect(() => {
+    setHeader({
+      screenTitle: 'New Project',
+      headerSubtitle: 'Step 1 of 3',
+      showProgressBar: true,
+      projectIndex: 1,
+      numberOfSteps: 3,
+    });
+
+    return () => {
+      resetHeader();
+    };
+  }, [setHeader, resetHeader]);
+
+  const handleContinue = () => {
+    router.navigate('ProjectLocation');
+  };
+  return (
+    <Screen>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'android' ? 180 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ flex: 1, justifyContent: 'space-between' }}>
+            <View style={{ gap: 16 }}>
+              <View
+                style={{
+                  backgroundColor: '#30a65b1a',
+                  height: 56,
+                  width: 56,
+                  justifyContent: 'center',
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+              >
+                <Grid3x3 height={32} width={32} color={Theme.colors.primary} />
+              </View>
+              <H3>Project Title</H3>
+              <Input
+                onChangeText={text => setProjectTitle(text)}
+                value={projectTitle || ''}
+                placeholder="e.g., Wheat Drought Tolerance Study 2024"
+                label="Give your research project a descriptive name"
+                error={errorStatus || undefined}
+              />
+            </View>
+            <Button disabled={projectTitle === ''} onPress={handleContinue}>
+              Continue
+            </Button>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
+  );
+};
+
+export default ProjectTitle;
