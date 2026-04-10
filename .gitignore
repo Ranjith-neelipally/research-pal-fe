@@ -34,6 +34,10 @@ local.properties
 *.keystore
 !debug.keystore
 .kotlin/
+android/**/*.apk
+android/**/*.aab
+android/app/release/output-metadata.json
+android/app/release/baselineProfiles/
 
 # node.js
 #
