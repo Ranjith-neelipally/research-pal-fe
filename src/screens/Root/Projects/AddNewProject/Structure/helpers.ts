@@ -1,10 +1,11 @@
 export interface Plot {
-  id: string;
+  id?: string;
   plotIndex: [number, number];
   treatment: number;
   replication: number;
   title: string;
-  color?: string;
+  color: string;
+  customName?: string;
   _id?: string;
 }
 
@@ -13,8 +14,6 @@ export interface ProjectLayoutPayload {
   userId?: string;
   plots: Plot[];
 }
-
-export type PlotGrid = Plot[][];
 
 export const TreatmentColors = [
   '#30a65b',
@@ -37,53 +36,53 @@ export const getDefaultPlotName = (
   treatment: number,
 ) => `R${replication}-T${treatment}`;
 
+export const getPlotId = (replication: number, treatment: number) =>
+  `plot-${replication}-${treatment}`;
+
 export const getPlotDisplayName = (
-  plot: Pick<Plot, 'replication' | 'treatment' | 'title'>,
-) => plot.title.trim() || getDefaultPlotName(plot.replication, plot.treatment);
+  plot: Pick<Plot, 'replication' | 'treatment' | 'title' | 'customName'>,
+) =>
+  plot.customName?.trim() ||
+  plot.title?.trim() ||
+  getDefaultPlotName(plot.replication, plot.treatment);
 
-export const hasCustomPlotTitle = (
-  plot: Pick<Plot, 'replication' | 'treatment' | 'title'>,
-) => plot.title.trim() !== getDefaultPlotName(plot.replication, plot.treatment);
+export const getPlotCustomName = (
+  plot: Pick<Plot, 'replication' | 'treatment' | 'title' | 'customName'>,
+) => {
+  const customName = plot.customName?.trim();
 
-export const createPlot = (
-  replication: number,
-  column: number,
-  existing?: Partial<Plot>,
-): Plot => {
-  const treatment = existing?.treatment ?? column;
+  if (customName) {
+    return customName;
+  }
 
-  return {
-    id: `plot-${replication}-${column}`,
-    plotIndex: [replication, column] as [number, number],
-    replication,
-    treatment,
-    title: existing?.title?.trim() || getDefaultPlotName(replication, treatment),
-    _id: existing?._id,
-  };
+  const title = plot.title?.trim();
+  const defaultName = getDefaultPlotName(plot.replication, plot.treatment);
+
+  return title && title !== defaultName ? title : undefined;
 };
-
-export const generatePlotGrid = (
-  replications: number,
-  treatments: number,
-  previousGrid?: PlotGrid,
-): PlotGrid =>
-  Array.from({ length: replications }, (_, rowIndex) =>
-    Array.from({ length: treatments }, (_, colIndex) =>
-      createPlot(
-        rowIndex + 1,
-        colIndex + 1,
-        previousGrid?.[rowIndex]?.[colIndex],
-      ),
-    ),
-  );
-
-export const flattenPlotGrid = (grid: PlotGrid): Plot[] =>
-  grid.reduce<Plot[]>((allPlots, row) => [...allPlots, ...row], []);
 
 export const generatePlots = (
   replications: number,
   treatments: number,
-): Plot[] => flattenPlotGrid(generatePlotGrid(replications, treatments));
+): Plot[] => {
+  const result: Plot[] = [];
+
+  for (let r = 1; r <= replications; r++) {
+    for (let t = 1; t <= treatments; t++) {
+      result.push({
+        id: getPlotId(r, t),
+        plotIndex: [r, t] as [number, number],
+        replication: r,
+        treatment: t,
+        title: getDefaultPlotName(r, t),
+        color: getTreatmentColor(t),
+        customName: undefined,
+      });
+    }
+  }
+
+  return result;
+};
 
 export const buildGrid = (plots: Plot[], rows: number, cols: number) => {
   const grid: (Plot | null)[][] = Array.from({ length: rows }, () =>

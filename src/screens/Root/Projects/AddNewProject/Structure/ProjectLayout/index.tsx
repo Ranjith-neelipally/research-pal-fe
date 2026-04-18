@@ -1,19 +1,14 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useState,
-} from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
-  flattenPlotGrid,
+  buildGrid,
   getDefaultPlotName,
+  getPlotCustomName,
   getPlotDisplayName,
-  hasCustomPlotTitle,
-  generatePlotGrid,
+  getPlotId,
   getTreatmentColor,
+  generatePlots,
   Plot,
-  PlotGrid,
   ProjectLayoutPayload,
 } from '../helpers';
 import MyModal from '../../../../../../components/modal';
@@ -33,7 +28,6 @@ import {
   CommonActions,
 } from '@react-navigation/native';
 import { useStackScreenStore } from '../../../../../../services/StackScreen/stackScreen.store';
-import LoadingState from '../../../../../../components/LoadingState';
 
 interface ProjectLayoutInputProps {
   replications: number;
@@ -45,7 +39,7 @@ interface ProjectLayoutInputProps {
 }
 
 interface PlotData {
-  title: string;
+  name?: string;
   replication: number;
   treatment: number;
   plotIndex: [number, number];
@@ -57,7 +51,7 @@ const ProjectLayout = ({
   setselectedTreatmentAndReplication,
   projectId,
 }: ProjectLayoutInputProps) => {
-  const [grid, setGrid] = useState<PlotGrid>([]);
+  const [plots, setPlots] = useState<Plot[]>([]);
   const setHeader = useStackScreenStore(state => state.setHeader);
   const resetHeader = useStackScreenStore(state => state.resetHeader);
   const setReplications = useAddNewProjectStore(state => state.setReplications);
@@ -87,11 +81,32 @@ const ProjectLayout = ({
   const [selectedPlotData, setselectedPlotData] = useState<PlotData | null>(
     null,
   );
-  const [isCreatingPlots, setIsCreatingPlots] = useState(false);
-  const plots = flattenPlotGrid(grid);
+
+  const grid = buildGrid(plots, replications, treatments);
 
   React.useEffect(() => {
-    setGrid(prev => generatePlotGrid(replications, treatments, prev));
+    setPlots(prev => {
+      const next = generatePlots(replications, treatments);
+
+      return next.map(p => {
+        const existing = prev.find(
+          x =>
+            x.plotIndex[0] === p.plotIndex[0] &&
+            x.plotIndex[1] === p.plotIndex[1],
+        );
+
+        return existing
+          ? {
+              ...existing,
+              id: getPlotId(existing.replication, existing.treatment),
+              customName: getPlotCustomName(existing),
+              title:
+                getPlotDisplayName(existing),
+              color: getTreatmentColor(existing.treatment),
+            }
+          : p;
+      });
+    });
     setReplications(replications);
     setTreatments(treatments);
   }, [replications, setReplications, setTreatments, treatments]);
@@ -105,99 +120,100 @@ const ProjectLayout = ({
     });
   }, [replications, setselectedTreatmentAndReplication, treatments]);
 
+  const buildPayload = (): ProjectLayoutPayload => ({
+    projectId,
+    userId,
+    plots,
+  });
+
+  const getSelectedPlotObject = () => {
+    if (!selectedPlot) {
+      return null;
+    }
+
+    return plots.find(
+      plot =>
+        plot.plotIndex[0] === selectedPlot[0] &&
+        plot.plotIndex[1] === selectedPlot[1],
+    );
+  };
+
   const handleOnSave = () => {
     if (!selectedPlot || !selectedPlotData) return;
 
-    setGrid(prevGrid => {
+    setPlots(prev => {
       const sourceIndex = selectedPlot;
       const targetIndex: [number, number] = [
         selectedPlotData.replication,
         selectedPlotData.treatment,
       ];
-      const isValidTarget =
-        targetIndex[0] >= 1 &&
-        targetIndex[0] <= replications &&
-        targetIndex[1] >= 1 &&
-        targetIndex[1] <= treatments;
-
-      if (!isValidTarget) {
-        return prevGrid;
-      }
-
-      const sourceRow = sourceIndex[0] - 1;
-      const sourceCol = sourceIndex[1] - 1;
-      const targetRow = targetIndex[0] - 1;
-      const targetCol = targetIndex[1] - 1;
-      const sourcePlot = prevGrid[sourceRow]?.[sourceCol];
-      const targetPlot = prevGrid[targetRow]?.[targetCol];
+      const sourcePlot = prev.find(
+        plot =>
+          plot.plotIndex[0] === sourceIndex[0] &&
+          plot.plotIndex[1] === sourceIndex[1],
+      );
+      const targetPlot = prev.find(
+        plot =>
+          plot.plotIndex[0] === targetIndex[0] &&
+          plot.plotIndex[1] === targetIndex[1],
+      );
 
       if (!sourcePlot || !targetPlot) {
-        return prevGrid;
+        return prev;
       }
+
+      const sourceCustomName = selectedPlotData.name?.trim() || undefined;
+      const sourceTitle =
+        sourceCustomName ||
+        getDefaultPlotName(sourcePlot.replication, sourcePlot.treatment);
 
       if (
         sourceIndex[0] === targetIndex[0] &&
         sourceIndex[1] === targetIndex[1]
       ) {
-        const nextTitle =
-          selectedPlotData.title.trim() ||
-          getDefaultPlotName(sourcePlot.replication, sourcePlot.treatment);
-
-        return prevGrid.map((row, rowIndex) =>
-          row.map((cell, colIndex) =>
-            rowIndex === sourceRow && colIndex === sourceCol
-              ? {
-                  ...cell,
-                  title: nextTitle,
-                }
-              : cell,
-          ),
+        return prev.map(p =>
+          p.plotIndex[0] === sourceIndex[0] && p.plotIndex[1] === sourceIndex[1]
+            ? {
+                ...p,
+                customName: sourceCustomName,
+                title: sourceTitle,
+              }
+            : p,
         );
       }
 
-      const nextGrid = prevGrid.map(row => row.map(cell => ({ ...cell })));
-      const sourceTreatment = sourcePlot.treatment;
-      const targetTreatment = targetPlot.treatment;
-      const sourceNextTitle =
-        selectedPlotData.title.trim() ||
-        getDefaultPlotName(sourcePlot.replication, targetTreatment);
-      const targetNextTitle = hasCustomPlotTitle(targetPlot)
-        ? targetPlot.title
-        : getDefaultPlotName(targetPlot.replication, sourceTreatment);
+      const sourcePlotIndex = sourcePlot.plotIndex;
+      const targetPlotIndex = targetPlot.plotIndex;
 
-      nextGrid[sourceRow][sourceCol] = {
-        ...nextGrid[sourceRow][sourceCol],
-        treatment: targetTreatment,
-        title: sourceNextTitle,
-      };
-      nextGrid[targetRow][targetCol] = {
-        ...nextGrid[targetRow][targetCol],
-        treatment: sourceTreatment,
-        title: targetNextTitle,
-      };
+      return prev.map(plot => {
+        const isSourceCell =
+          plot.plotIndex[0] === sourceIndex[0] &&
+          plot.plotIndex[1] === sourceIndex[1];
+        const isTargetCell =
+          plot.plotIndex[0] === targetIndex[0] &&
+          plot.plotIndex[1] === targetIndex[1];
 
-      return generatePlotGrid(replications, treatments, nextGrid);
+        if (isSourceCell) {
+          return {
+            ...plot,
+            customName: sourceCustomName,
+            title: sourceTitle,
+            plotIndex: targetPlotIndex,
+          };
+        }
+
+        if (isTargetCell) {
+          return {
+            ...plot,
+            plotIndex: sourcePlotIndex,
+          };
+        }
+
+        return plot;
+      });
     });
     setselectedPlot(null);
     setselectedPlotData(null);
-  };
-
-  const getSelectedDefaultName = () => {
-    if (!selectedPlot || !selectedPlotData) {
-      return '';
-    }
-
-    const sourceRow = selectedPlot[0] - 1;
-    const sourceCol = selectedPlot[1] - 1;
-    const targetRow = selectedPlotData.replication - 1;
-    const targetCol = selectedPlotData.treatment - 1;
-    const sourceTreatment = grid[sourceRow]?.[sourceCol]?.treatment;
-    const targetTreatment = grid[targetRow]?.[targetCol]?.treatment;
-
-    return getDefaultPlotName(
-      selectedPlot[0],
-      targetTreatment ?? sourceTreatment ?? selectedPlot[1],
-    );
   };
 
   const generetetePlots = (
@@ -237,7 +253,7 @@ const ProjectLayout = ({
                   plotIndex: newIndex,
                   replication: newIndex[0],
                   treatment: newIndex[1],
-                  title: selectedPlotData.title,
+                  name: selectedPlotData.name,
                 });
               }}
             >
@@ -262,19 +278,10 @@ const ProjectLayout = ({
     );
   };
 
-  const nextProcess = useCallback(async () => {
+  const nextProcess = async () => {
     if (!projectId) return;
 
-    setIsCreatingPlots(true);
-    const payload: ProjectLayoutPayload = {
-      projectId,
-      userId,
-      plots: plots.map(plot => ({
-        ...plot,
-        title: getPlotDisplayName(plot),
-        color: getTreatmentColor(plot.treatment),
-      })),
-    };
+    const payload = buildPayload();
     const res = await createPlotsService(payload);
     if (res.status === 201) {
       console.log('Plots created successfully');
@@ -300,12 +307,11 @@ const ProjectLayout = ({
     }
 
     console.log(payload, 'payload');
-    setIsCreatingPlots(false);
-  }, [navigation, plots, projectId, userId]);
+  };
 
   useEffect(() => {
     nextProcess();
-  }, [nextProcess]);
+  }, [projectId]);
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -317,16 +323,29 @@ const ProjectLayout = ({
         <View>
           <Input
             label="Plot Name (optional)"
-            placeholder={getSelectedDefaultName()}
-            value={selectedPlotData?.title ?? ''}
+            placeholder={
+              getSelectedPlotObject()
+                ? getDefaultPlotName(
+                    getSelectedPlotObject()!.replication,
+                    getSelectedPlotObject()!.treatment,
+                  )
+                : ''
+            }
+            value={selectedPlotData?.name ?? ''}
             onChangeText={text =>
               setselectedPlotData(prev =>
-                prev ? { ...prev, title: text } : prev,
+                prev ? { ...prev, name: text } : prev,
               )
             }
           />
           <MutedText style={{ marginTop: 8 }}>
-            Default {getSelectedDefaultName()}
+            Default{' '}
+            {getSelectedPlotObject()
+              ? getDefaultPlotName(
+                  getSelectedPlotObject()!.replication,
+                  getSelectedPlotObject()!.treatment,
+                )
+              : ''}
           </MutedText>
         </View>
 
@@ -359,58 +378,46 @@ const ProjectLayout = ({
           </Button>
         </View>
       </MyModal>
-      {isCreatingPlots ? (
-        <LoadingState label="Setting up plots..." />
-      ) : (
-        <View>
-          {grid.map((row, rowIndex) => (
-            <View
-              key={`row-${rowIndex + 1}`}
-              style={{ flexDirection: 'row', marginBottom: 8 }}
-            >
-              {row.map((cell, colIndex) => (
-                <TouchableOpacity
-                  key={cell?.id ?? `empty-${rowIndex + 1}-${colIndex + 1}`}
-                  onPress={() => {
-                    if (!cell) return;
+      <View>
+        {grid.map((row, rowIndex) => (
+          <View
+            key={rowIndex}
+            style={{ flexDirection: 'row', marginBottom: 8 }}
+          >
+            {row.map((cell, colIndex) => (
+              <TouchableOpacity
+                key={cell?.id ?? `empty-${rowIndex + 1}-${colIndex + 1}`}
+                onPress={() => {
+                  if (!cell) return;
 
-                    setselectedPlot(cell.plotIndex);
-                    setselectedPlotData({
-                      title: hasCustomPlotTitle(cell) ? cell.title : '',
-                      replication: cell.replication,
-                      treatment: cell.treatment,
-                      plotIndex: cell.plotIndex,
-                    });
-                  }}
-                  style={{
-                    width: 60,
-                    height: 60,
-                    marginRight: 8,
-                    backgroundColor: cell
-                      ? getTreatmentColor(cell.treatment)
-                      : '#E5E7EB',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderRadius: 6,
-                  }}
-                >
-                  {cell && (
-                    <Text
-                      style={{
-                        color: '#fff',
-                        fontSize: 12,
-                        textAlign: 'center',
-                      }}
-                    >
-                      {getPlotDisplayName(cell)}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-        </View>
-      )}
+                  setselectedPlot(cell.plotIndex);
+                  setselectedPlotData({
+                    name: getPlotCustomName(cell) ?? '',
+                    replication: cell.plotIndex[0],
+                    treatment: cell.plotIndex[1],
+                    plotIndex: cell.plotIndex,
+                  });
+                }}
+                style={{
+                  width: 60,
+                  height: 60,
+                  marginRight: 8,
+                  backgroundColor: cell?.color ?? '#E5E7EB',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 6,
+                }}
+              >
+                {cell && (
+                  <Text style={{ color: '#fff', fontSize: 12 }}>
+                    {getPlotDisplayName(cell)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 };
