@@ -100,8 +100,7 @@ const ProjectLayout = ({
               ...existing,
               id: getPlotId(existing.replication, existing.treatment),
               customName: getPlotCustomName(existing),
-              title:
-                getPlotDisplayName(existing),
+              title: getPlotDisplayName(existing),
               color: getTreatmentColor(existing.treatment),
             }
           : p;
@@ -141,77 +140,30 @@ const ProjectLayout = ({
   const handleOnSave = () => {
     if (!selectedPlot || !selectedPlotData) return;
 
-    setPlots(prev => {
-      const sourceIndex = selectedPlot;
-      const targetIndex: [number, number] = [
-        selectedPlotData.replication,
-        selectedPlotData.treatment,
-      ];
-      const sourcePlot = prev.find(
-        plot =>
-          plot.plotIndex[0] === sourceIndex[0] &&
-          plot.plotIndex[1] === sourceIndex[1],
-      );
-      const targetPlot = prev.find(
-        plot =>
-          plot.plotIndex[0] === targetIndex[0] &&
-          plot.plotIndex[1] === targetIndex[1],
-      );
+    setPlots(prev =>
+      prev.map(plot => {
+        const isSelected =
+          plot.plotIndex[0] === selectedPlot[0] &&
+          plot.plotIndex[1] === selectedPlot[1];
 
-      if (!sourcePlot || !targetPlot) {
-        return prev;
-      }
+        if (!isSelected) return plot;
 
-      const sourceCustomName = selectedPlotData.name?.trim() || undefined;
-      const sourceTitle =
-        sourceCustomName ||
-        getDefaultPlotName(sourcePlot.replication, sourcePlot.treatment);
+        const newReplication = selectedPlotData.replication;
+        const newTreatment = selectedPlotData.treatment;
 
-      if (
-        sourceIndex[0] === targetIndex[0] &&
-        sourceIndex[1] === targetIndex[1]
-      ) {
-        return prev.map(p =>
-          p.plotIndex[0] === sourceIndex[0] && p.plotIndex[1] === sourceIndex[1]
-            ? {
-                ...p,
-                customName: sourceCustomName,
-                title: sourceTitle,
-              }
-            : p,
-        );
-      }
+        const customName = selectedPlotData.name?.trim() || undefined;
 
-      const sourcePlotIndex = sourcePlot.plotIndex;
-      const targetPlotIndex = targetPlot.plotIndex;
+        return {
+          ...plot,
+          replication: newReplication,
+          treatment: newTreatment,
+          title: customName || getDefaultPlotName(newReplication, newTreatment),
+          customName,
+          color: getTreatmentColor(newTreatment),
+        };
+      }),
+    );
 
-      return prev.map(plot => {
-        const isSourceCell =
-          plot.plotIndex[0] === sourceIndex[0] &&
-          plot.plotIndex[1] === sourceIndex[1];
-        const isTargetCell =
-          plot.plotIndex[0] === targetIndex[0] &&
-          plot.plotIndex[1] === targetIndex[1];
-
-        if (isSourceCell) {
-          return {
-            ...plot,
-            customName: sourceCustomName,
-            title: sourceTitle,
-            plotIndex: targetPlotIndex,
-          };
-        }
-
-        if (isTargetCell) {
-          return {
-            ...plot,
-            plotIndex: sourcePlotIndex,
-          };
-        }
-
-        return plot;
-      });
-    });
     setselectedPlot(null);
     setselectedPlotData(null);
   };
@@ -386,15 +338,18 @@ const ProjectLayout = ({
           >
             {row.map((cell, colIndex) => (
               <TouchableOpacity
-                key={cell?.id ?? `empty-${rowIndex + 1}-${colIndex + 1}`}
+                key={
+                  cell?.id ??
+                  `empty-${cell && cell.replication + 1}-${colIndex + 1}`
+                }
                 onPress={() => {
                   if (!cell) return;
 
                   setselectedPlot(cell.plotIndex);
                   setselectedPlotData({
                     name: getPlotCustomName(cell) ?? '',
-                    replication: cell.plotIndex[0],
-                    treatment: cell.plotIndex[1],
+                    replication: cell.replication,
+                    treatment: cell.treatment,
                     plotIndex: cell.plotIndex,
                   });
                 }}
