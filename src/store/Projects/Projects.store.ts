@@ -12,6 +12,11 @@ export interface Project {
   updatedAt: string;
   plotColors: string[];
   notesCount: number;
+  serverVersion?: number;
+  lastModifiedByDeviceId?: string;
+  syncedAt?: string | null;
+  createdOfflineAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'conflict' | 'local_only';
 }
 
 export interface ProjectAction {

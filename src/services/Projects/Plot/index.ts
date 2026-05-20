@@ -1,30 +1,24 @@
-import axios from 'axios';
 import { ProjectLayoutPayload } from '../../../screens/Root/Projects/AddNewProject/Structure/helpers';
 import api from '../../api';
+import { normalizeApiError } from '../../apiError';
+
+const serviceError = (error: unknown) => {
+  const parsed = normalizeApiError(error);
+  return {
+    status: parsed.status || 500,
+    message: parsed.message,
+  };
+};
 
 export const createPlotsService = async (data: ProjectLayoutPayload) => {
   try {
     const res = await api.post('/projects/plot', data);
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('payload', data);
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };
 
@@ -49,24 +43,10 @@ export const getPlotNoteService = async (
     });
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('projectId', projectId);
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };
 
@@ -88,24 +68,10 @@ export const addPlotNoteService = async (
     const res = await api.post('/projects/note', payload);
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('payload', payload);
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };
 
@@ -129,23 +95,10 @@ export const updatePlotNoteService = async (
     const res = await api.patch('/projects/note', payload);
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };
 
@@ -169,23 +122,10 @@ export const deletePlotNoteService = async (
 
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };
 
@@ -211,22 +151,9 @@ export const getProjectNotesByDateService = async (
 
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
-    return {
-      status: 500,
-      message: 'Unexpected error',
-    };
+    return serviceError(error);
   }
 };

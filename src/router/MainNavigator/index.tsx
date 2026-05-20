@@ -2,11 +2,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
 
 import { useAuthStore } from '../../store/auth.store';
-import { getAllStoredData } from '../../utils/common';
 
 import AuthNavigator from '../AuthNavigator';
 import RootNavigator from '../RootNavigator';
 import ProjectsNavigator from '../ProjectsNavigator';
+import { refreshSession } from '../../services/login';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -17,7 +17,6 @@ export type RootStackParamList = {
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 function MainNavigator() {
-  const setUser = useAuthStore(state => state.setUser);
   const setHydrated = useAuthStore(state => state.setHydrated);
   const isHydrated = useAuthStore(state => state.isHydrated);
   const token = useAuthStore(state => state.user?.token);
@@ -26,17 +25,7 @@ function MainNavigator() {
 
   useEffect(() => {
     const bootstrapAuth = async () => {
-      const stored = await getAllStoredData();
-
-      if (stored?.access_token) {
-        setUser({
-          _id: stored['_id'] || '',
-          username: stored['username'] || '',
-          email: stored['email'] || '',
-          verified: stored['verified'] === 'true',
-          token: stored['access_token'],
-        });
-      }
+      await refreshSession();
 
       setHydrated(true);
     };

@@ -1,25 +1,19 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeApiError } from './apiError';
 
-const getTokenFromStorage = async () => {
-  try {
-    const token = await AsyncStorage.getItem('access_token');
-    return token;
-  } catch (error) {
-    console.error('Error retrieving token from storage:', error);
-    return null;
-  }
-}
+const API_BASE_URL = 'https://node-be-sigma.vercel.app/';
+const REFRESH_TOKEN_KEY = 'refresh_token';
+
+let refreshPromise: Promise<string | null> | null = null;
 
 // Create an instance of Axios
 const api = axios.create({
-  // baseURL: 'http://192.168.31.60:1430/',
+  baseURL: 'http://192.168.31.60:1430/',
   // baseURL: 'http://10.0.2.2:1430/',
-    baseURL: 'https://node-be-sigma.vercel.app/',
+    // baseURL: API_BASE_URL,
   // baseURL: 'http://192.168.31.60:1430/',
-  // baseURL: 'https://research-pal-api-726814154156.asia-south1.run.app/',
-  // baseURL: 'https://research-pal-api-726814154156.asia-south1.run.app/',
 
   headers: {
     'Content-Type': 'application/json',
@@ -34,8 +28,7 @@ api.interceptors.request.use(
       config.headers = {};
     }
     const user = useAuthStore.getState().getUser();
-    const tokenData = user?.token || await getTokenFromStorage();
-    console.log(tokenData, 'api token');
+    const tokenData = user?.token;
 
     if (tokenData) {
       config.headers.Authorization = `Bearer ${tokenData}`;
@@ -48,16 +41,83 @@ api.interceptors.request.use(
   },
 );
 
-// Response interceptor
+const clearSession = async () => {
+  await AsyncStorage.multiRemove([
+    REFRESH_TOKEN_KEY,
+    '_id',
+    'username',
+    'verified',
+    'email',
+  ]);
+  await useAuthStore.getState().clearUser();
+};
+
+const refreshAccessToken = async () => {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+
+      if (!refreshToken) {
+        await clearSession();
+        return null;
+      }
+
+      try {
+        const response = await axios.post(`${API_BASE_URL}auth/refresh`, {
+          refreshToken,
+        });
+        const responseData = response.data?.data || response.data;
+        const nextAccessToken = responseData.accessToken || responseData.token;
+        const nextRefreshToken = responseData.refreshToken;
+
+        if (!nextAccessToken || !nextRefreshToken) {
+          await clearSession();
+          return null;
+        }
+
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+        useAuthStore.getState().setAccessToken(nextAccessToken);
+        return nextAccessToken;
+      } catch (error) {
+        await clearSession();
+        return null;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+};
+
 api.interceptors.response.use(
   response => {
-    // Modify the response data
-    // response.data = transformData(response.data);
     return response;
   },
-  error => {
-    // Handle response errors
-    return Promise.reject(error);
+  async error => {
+    const originalRequest = error.config;
+    const status = error.response?.status;
+    const url = originalRequest?.url || '';
+
+    if (
+      status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !url.includes('auth/login') &&
+      !url.includes('auth/sign-in') &&
+      !url.includes('auth/refresh')
+    ) {
+      originalRequest._retry = true;
+      const accessToken = await refreshAccessToken();
+
+      if (accessToken) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      }
+    }
+
+    return Promise.reject(normalizeApiError(error));
   },
 );
 

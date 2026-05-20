@@ -1,5 +1,14 @@
-import { QuickNote, useQuickNotesStore } from '../store/notes.store';
+import { useQuickNotesStore } from '../store/notes.store';
 import api from './api';
+import { normalizeApiError } from './apiError';
+
+const serviceError = (error: unknown) => {
+  const parsed = normalizeApiError(error);
+  return {
+    status: parsed.status || 500,
+    message: parsed.message,
+  };
+};
 
 export async function addQuickNoteService(idea: {
   userId: string;
@@ -10,11 +19,10 @@ export async function addQuickNoteService(idea: {
     const res = await api.post('/ideas', idea);
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('Error adding quick note:', error);
-    throw error;
+    return serviceError(error);
   }
 }
 
@@ -32,22 +40,21 @@ export async function getQuickNotesService(params: {
     }
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('Error fetching quick notes:', error);
+    return serviceError(error);
   }
 }
 
 export async function deleteQuickNotes(idea: { userId: string; _id: string }) {
   try {
-    console.log({ data: idea });
     const res = await api.delete('/ideas', { data: idea });
     return {
       res,
     };
   } catch (error) {
-    console.error('Error deleting quick nootes', error);
+    return serviceError(error);
   }
 }
 
@@ -60,9 +67,9 @@ export async function updateQuickNotes(
     const res = await api.patch(`/ideas`, { idea: note, userId, _id: noteId });
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('Error deleting quick nootes', error);
+    return serviceError(error);
   }
 }

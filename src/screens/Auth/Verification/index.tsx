@@ -9,6 +9,7 @@ import { LoginScreen, LogoAndTitle, IconContainer, LoginForm } from '../Login/st
 import { handleAccountVerification } from '../../../services/login';
 import { useNavigation } from '@react-navigation/native';
 import LoadingState from '../../../components/LoadingState';
+import { showApiErrorAlert } from '../../../services/apiError';
 
 
 const VerificationScreen = () => {
@@ -55,16 +56,14 @@ const VerificationScreen = () => {
     setIsVerifying(true);
     try {
       const res = await handleAccountVerification(otpValue);
-      console.log('Verification success:', res);
       if (res && res.status === 200) {
         navigation.navigate('Login' as never);
       }
     } catch (error) {
-      console.error('Verification failed:', error);
+      showApiErrorAlert('Verification failed', error);
     } finally {
       setIsVerifying(false);
     }
-    console.log(otpValue);
   };
 
   return (

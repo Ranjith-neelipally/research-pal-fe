@@ -16,6 +16,14 @@ export interface PlotNote {
   photoIds?: string[];
   createdAt: string;
   updatedAt: string;
+  serverVersion?: number;
+  lastModifiedByDeviceId?: string;
+  syncedAt?: string | null;
+  createdOfflineAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'conflict' | 'local_only';
+  isConflict?: boolean;
+  conflictGroupId?: string | null;
+  conflictReason?: string | null;
 }
 
 export const PAGE_SIZE = 10;

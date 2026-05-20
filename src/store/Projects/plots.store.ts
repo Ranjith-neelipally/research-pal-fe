@@ -12,6 +12,11 @@ interface PlotInterface {
   createdAt?: string;
   updatedAt?: string;
   __v?: number;
+  serverVersion?: number;
+  lastModifiedByDeviceId?: string;
+  syncedAt?: string | null;
+  createdOfflineAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'conflict' | 'local_only';
 }
 
 interface Plots {

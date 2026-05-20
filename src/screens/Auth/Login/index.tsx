@@ -3,7 +3,6 @@ import {
   Text,
   TouchableWithoutFeedback,
   Keyboard,
-  Alert,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LoginScreen, IconContainer, LogoAndTitle, LoginForm } from './styles';
@@ -14,7 +13,7 @@ import Button from '../../../components/Button';
 import { Theme } from '../../../components/theme';
 import { loginService } from '../../../services/login';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { getAllStoredData } from '../../../utils/common';
+import { showApiErrorAlert } from '../../../services/apiError';
 const Login = () => {
   const navigation = useNavigation<NavigationProp<any>>();
 
@@ -25,8 +24,6 @@ const Login = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {},
   );
-
-  const token = getAllStoredData();
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -57,9 +54,7 @@ const Login = () => {
         routes: [{ name: 'Main' }],
       });
     } catch (err: any) {
-      if (err.response && err.response.data && err.response.data.message) {
-        Alert.alert('Login failed', err.response.data.message);
-      }
+      showApiErrorAlert('Login failed', err);
     } finally {
       setIsLoading(false);
     }

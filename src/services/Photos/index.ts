@@ -1,5 +1,5 @@
-import axios from 'axios';
 import api from '../api';
+import { normalizeApiError } from '../apiError';
 
 export const getAllPhotoIds = async (userId: string) => {
   try {
@@ -10,22 +10,13 @@ export const getAllPhotoIds = async (userId: string) => {
     });
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
+    const parsed = normalizeApiError(error);
     return {
-      status: 500,
-      message: 'Unexpected error',
+      status: parsed.status || 500,
+      message: parsed.message,
     };
   }
 };
@@ -40,22 +31,13 @@ export const getPhotoDetails = async (photoId: string, userId: string) => {
     });
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
+    const parsed = normalizeApiError(error);
     return {
-      status: 500,
-      message: 'Unexpected error',
+      status: parsed.status || 500,
+      message: parsed.message,
     };
   }
 };

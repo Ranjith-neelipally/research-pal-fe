@@ -1,9 +1,9 @@
-import axios from 'axios';
 import {
   Project,
   useProjectsStore,
 } from '../../../store/Projects/Projects.store';
 import api from '../../api';
+import { normalizeApiError } from '../../apiError';
 
 export async function getAllProjectsService(userId: string) {
   try {
@@ -14,10 +14,14 @@ export async function getAllProjectsService(userId: string) {
     useProjectsStore.getState().setProjectsData(projects);
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('Error fetching projects:', error);
+    const parsed = normalizeApiError(error);
+    return {
+      status: parsed.status || 500,
+      message: parsed.message,
+    };
   }
 }
 
@@ -40,22 +44,13 @@ export async function createProjectService(projectData: Partial<Project>) {
 
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        status: error.response?.status,
-        message:
-          error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Something went wrong',
-      };
-    }
-
+    const parsed = normalizeApiError(error);
     return {
-      status: 500,
-      message: 'Unexpected error',
+      status: parsed.status || 500,
+      message: parsed.message,
     };
   }
 }
@@ -71,9 +66,13 @@ export async function getProjectDetailsService(
 
     return {
       status: res.status,
-      data: res.data,
+      data: res.data?.data || res.data,
     };
   } catch (error) {
-    console.error('Error fetching project details:', error);
+    const parsed = normalizeApiError(error);
+    return {
+      status: parsed.status || 500,
+      message: parsed.message,
+    };
   }
 }

@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
 import React, { useState } from 'react';
 import {
@@ -27,7 +26,8 @@ import {
 import Input from '../../../components/Input';
 import Button from '../../../components/Button';
 import { Theme } from '../../../components/theme';
-import { loginService, SignUp } from '../../../services/login';
+import { SignUp } from '../../../services/login';
+import { showApiErrorAlert } from '../../../services/apiError';
 import { useNavigation } from '@react-navigation/native';
 const Login = () => {
   const navigation = useNavigation();
@@ -113,11 +113,7 @@ const Login = () => {
       }
       setIsLoading(false);
     } catch (error: any) {
-      console.log(error, 'error');
-      Alert.alert(
-        'Sign Up Failed',
-        error?.response?.data?.message || 'An error occurred during sign up.',
-      );
+      showApiErrorAlert('Sign Up Failed', error, 'An error occurred during sign up.');
     } finally {
       setIsLoading(false);
     }

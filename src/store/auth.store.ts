@@ -20,6 +20,7 @@ interface AuthState {
 
   // Setters
   setUser: (user: User) => Promise<void>;
+  setAccessToken: (token: string) => void;
   setProjectId: (projectId: string) => Promise<void>;
   clearUser: () => Promise<void>;
   setHydrated: (value: boolean) => void;
@@ -38,6 +39,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: async (user: User) => {
     set({ user });
+  },
+
+  setAccessToken: (token: string) => {
+    const user = get().user;
+    if (user) {
+      set({ user: { ...user, token } });
+    }
   },
 
   setProjectId: async (projectId: string) => {
