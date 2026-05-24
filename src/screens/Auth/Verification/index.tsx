@@ -1,6 +1,5 @@
-import { View, Text, Keyboard, ScrollView, TouchableWithoutFeedback, TextInput, TouchableOpacity } from 'react-native'
+import { View, Text, Keyboard, ScrollView, TouchableWithoutFeedback, TextInput, TouchableOpacity, Image } from 'react-native'
 import React, { useState, useRef } from 'react'
-import { Leaf } from 'lucide-react-native';
 import { Screen } from 'react-native-screens';
 import { H1, MutedText } from '../../../components/commonStyles/styles';
 import Input from '../../../components/Input';
@@ -80,7 +79,11 @@ const VerificationScreen = () => {
           <Screen>
             <LogoAndTitle>
               <IconContainer>
-                <Leaf size={32} color={Theme.colors.primary} />
+                <Image
+                  source={require('../../../assets/images/logo.png')}
+                  style={{ width: 56, height: 56 }}
+                  resizeMode="contain"
+                />
               </IconContainer>
               <H1>Verify Account</H1>
               <MutedText>Enter the 6-digit code sent to your email.</MutedText>

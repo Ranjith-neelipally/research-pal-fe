@@ -104,27 +104,17 @@ export const buildGrid = (
       !Number.isFinite(plot.plotIndex[0]) ||
       !Number.isFinite(plot.plotIndex[1])
     ) {
-      console.warn('[buildGrid] Invalid plotIndex:', plot);
       return;
     }
 
-    const [r, c] = plot.plotIndex;
+    const r = Math.trunc(plot.plotIndex[0]);
+    const c = Math.trunc(plot.plotIndex[1]);
 
     if (r < 1 || c < 1 || r > safeRows || c > safeCols) {
-      console.warn('[buildGrid] plotIndex out of bounds:', plot.plotIndex, {
-        rows: safeRows,
-        cols: safeCols,
-        plot,
-      });
       return;
     }
 
     if (grid[r - 1][c - 1]) {
-      console.warn('[buildGrid] Duplicate physical cell mapping detected:', {
-        plotIndex: plot.plotIndex,
-        existing: grid[r - 1][c - 1],
-        incoming: plot,
-      });
       return;
     }
 

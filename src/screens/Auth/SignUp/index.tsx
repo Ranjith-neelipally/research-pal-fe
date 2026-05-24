@@ -2,9 +2,8 @@ import {
   View,
   TouchableWithoutFeedback,
   Keyboard,
-  KeyboardAvoidingView,
   ScrollView,
-  Platform,
+  Image,
 } from 'react-native';
 import React, { useState } from 'react';
 import {
@@ -15,7 +14,6 @@ import {
 } from '../Login/styles';
 import { H1, MutedText, Screen } from '../../../components/commonStyles/styles';
 import {
-  Leaf,
   Mail,
   Lock,
   EyeOff,
@@ -25,7 +23,6 @@ import {
 } from 'lucide-react-native';
 import Input from '../../../components/Input';
 import Button from '../../../components/Button';
-import { Theme } from '../../../components/theme';
 import { SignUp } from '../../../services/login';
 import { showApiErrorAlert } from '../../../services/apiError';
 import { useNavigation } from '@react-navigation/native';
@@ -137,7 +134,11 @@ const Login = () => {
           <Screen>
             <LogoAndTitle>
               <IconContainer>
-                <Leaf size={32} color={Theme.colors.primary} />
+                <Image
+                  source={require('../../../assets/images/logo.png')}
+                  style={{ width: 56, height: 56 }}
+                  resizeMode="contain"
+                />
               </IconContainer>
               <H1>Create Account</H1>
               <MutedText>Start your research journey.</MutedText>

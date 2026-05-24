@@ -31,7 +31,7 @@ function MainNavigator() {
     };
 
     bootstrapAuth();
-  }, []);
+  }, [setHydrated]);
 
   if (!isHydrated) {
     return null;

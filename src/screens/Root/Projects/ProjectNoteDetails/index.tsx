@@ -129,11 +129,13 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
           skip: nextSkip,
         });
 
-    const data = response?.data?.data;
-    const allFetchedNotes: PlotNote[] = data
-      ? Array.isArray(data)
-        ? data
-        : [data]
+    const payload = response && 'data' in response ? response.data : undefined;
+    const allFetchedNotes: PlotNote[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+      ? payload.data
+      : payload
+      ? [payload]
       : [];
 
     const pagedNotes =

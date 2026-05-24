@@ -215,7 +215,6 @@ const ProjectLayout = ({
     );
   };
 
-  console.log({grid})
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>

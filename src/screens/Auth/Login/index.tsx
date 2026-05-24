@@ -1,16 +1,15 @@
 import {
   View,
-  Text,
   TouchableWithoutFeedback,
   Keyboard,
+  Image,
 } from 'react-native';
 import React, { useState } from 'react';
 import { LoginScreen, IconContainer, LogoAndTitle, LoginForm } from './styles';
 import { H1, MutedText } from '../../../components/commonStyles/styles';
-import { Leaf, Mail, Lock, EyeOff, Eye } from 'lucide-react-native';
+import { Mail, Lock, EyeOff, Eye } from 'lucide-react-native';
 import Input from '../../../components/Input';
 import Button from '../../../components/Button';
-import { Theme } from '../../../components/theme';
 import { loginService } from '../../../services/login';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { showApiErrorAlert } from '../../../services/apiError';
@@ -70,7 +69,11 @@ const Login = () => {
         <View style={{ width: '85%', flex: 1, justifyContent: 'center' }}>
           <LogoAndTitle>
             <IconContainer>
-              <Leaf size={32} color={Theme.colors.primary} />
+              <Image
+                source={require('../../../assets/images/logo.png')}
+                style={{ width: 56, height: 56 }}
+                resizeMode="contain"
+              />
             </IconContainer>
             <H1>Welcome Back</H1>
             <MutedText>Sign in to continue your research.</MutedText>
