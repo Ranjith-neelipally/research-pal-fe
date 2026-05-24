@@ -55,6 +55,50 @@ export async function createProjectService(projectData: Partial<Project>) {
   }
 }
 
+export async function deleteProjectService(
+  projectId: string,
+  userId?: string,
+) {
+  try {
+    const res = await api.delete('/projects', {
+      data: {
+        _id: projectId,
+        userId,
+      },
+    });
+
+    return {
+      status: res.status,
+      data: res.data?.data || res.data,
+    };
+  } catch (error) {
+    const parsed = normalizeApiError(error);
+    return {
+      status: parsed.status || 500,
+      message: parsed.message,
+    };
+  }
+}
+
+export async function checkProjectTitleExistsService(title: string) {
+  try {
+    const res = await api.get('/projects/title-exists', {
+      params: { title },
+    });
+
+    return {
+      status: res.status,
+      data: res.data,
+    };
+  } catch (error) {
+    const parsed = normalizeApiError(error);
+    return {
+      status: parsed.status || 500,
+      message: parsed.message,
+    };
+  }
+}
+
 export async function getProjectDetailsService(
   projectId: string,
   userId: string,
@@ -66,7 +110,7 @@ export async function getProjectDetailsService(
 
     return {
       status: res.status,
-      data: res.data?.data || res.data,
+      data: res.data,
     };
   } catch (error) {
     const parsed = normalizeApiError(error);

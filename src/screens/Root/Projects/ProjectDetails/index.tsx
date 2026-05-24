@@ -1,4 +1,4 @@
-import { TouchableOpacity, View } from 'react-native';
+import { Alert, TouchableOpacity, View } from 'react-native';
 import { useProjectsStore } from '../../../../store/Projects/Projects.store';
 import { getProjectDetailsService } from '../../../../services/Projects/Project';
 import React, { useCallback, useLayoutEffect, useState } from 'react';
@@ -53,12 +53,24 @@ function ProjectDetails({ route }: any) {
       projectId,
       project?.userId!,
     );
-    if (plotData) {
-      console.log('Project details fetched successfully:', plotData);
-      setplotsData(plotData.data.data);
-      setAvailableDates(plotData.data.dates || []);
+    if (plotData && plotData.status === 200) {
+      const payload = plotData.data as any;
+      const normalizedPlots = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+        ? payload
+        : [];
+      const normalizedDates = Array.isArray(payload?.dates) ? payload.dates : [];
+
+      setplotsData(normalizedPlots);
+      setAvailableDates(normalizedDates);
     } else {
-      console.log('Failed to fetch project details.');
+      setplotsData([]);
+      setAvailableDates([]);
+      const message =
+        (plotData as any)?.message ||
+        'Unable to load plots for this project right now.';
+      Alert.alert('Failed to load project details', message);
     }
     setIsLoadingProjectDetails(false);
   }, [projectId, project?.userId]);
@@ -107,9 +119,9 @@ function ProjectDetails({ route }: any) {
   ]);
 
   const grid = buildGrid(
-    plotsData,
-    project?.replicationsCount!,
-    project?.treatmentsCount!,
+    Array.isArray(plotsData) ? plotsData : [],
+    project?.replicationsCount || 0,
+    project?.treatmentsCount || 0,
   );
 
   const handlePlotPress = (plot: Plot | null) => () => {

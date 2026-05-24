@@ -3,17 +3,14 @@ import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeApiError } from './apiError';
 
-const API_BASE_URL = 'https://node-be-sigma.vercel.app/';
+const API_BASE_URL = 'http://10.252.212.6:1430/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 let refreshPromise: Promise<string | null> | null = null;
 
 // Create an instance of Axios
 const api = axios.create({
-  baseURL: 'http://192.168.31.60:1430/',
-  // baseURL: 'http://10.0.2.2:1430/',
-    // baseURL: API_BASE_URL,
-  // baseURL: 'http://192.168.31.60:1430/',
+  baseURL: API_BASE_URL,
 
   headers: {
     'Content-Type': 'application/json',

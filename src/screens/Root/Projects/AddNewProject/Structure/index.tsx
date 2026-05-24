@@ -4,8 +4,9 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   H3,
   MutedText,
@@ -20,13 +21,97 @@ import Button from '../../../../../components/Button';
 import { Check } from 'lucide-react-native';
 import { ButtonText } from '../../../../../components/Button/styles';
 import ProjectLayout from './ProjectLayout';
-import { TreatmentColors as colors } from './helpers';
+import { Plot, TreatmentColors as colors } from './helpers';
 import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
 import { useAuthStore } from '../../../../../store/auth.store';
-import { createProjectService } from '../../../../../services/Projects/Project';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { Project } from '../../../../../store/Projects/Projects.store';
+import {
+  createProjectService,
+  deleteProjectService,
+} from '../../../../../services/Projects/Project';
+import { createPlotsService } from '../../../../../services/Projects/Plot';
+import {
+  useNavigation,
+  NavigationProp,
+  CommonActions,
+} from '@react-navigation/native';
 import LoadingState from '../../../../../components/LoadingState';
+
+type PlotPayload = {
+  title: string;
+  color: string;
+  notesCount: number;
+  replication: number;
+  treatment: number;
+  plotIndex: [number, number];
+};
+
+const preparePlotsPayload = (plots: Plot[]): PlotPayload[] =>
+  plots.map(plot => {
+    const replication = Number(plot.replication);
+    const treatment = Number(plot.treatment);
+    const trimmedTitle = plot.title?.trim();
+    const physicalIndex: [number, number] = [plot.plotIndex[0], plot.plotIndex[1]];
+
+    return {
+      title: trimmedTitle || `R${replication}-T${treatment}`,
+      color: plot.color,
+      notesCount: 0,
+      replication,
+      treatment,
+      plotIndex: physicalIndex,
+    };
+  });
+
+const validatePlotsBeforeCreate = (
+  plots: PlotPayload[],
+  replicationsLimit: number,
+  treatmentsLimit: number,
+) => {
+  if (!Array.isArray(plots) || plots.length === 0) {
+    return 'No plots provided.';
+  }
+
+  if (plots.length < 4) {
+    return 'At least 4 plots are required.';
+  }
+
+  const batchTitles = new Set<string>();
+  const batchIndexes = new Set<string>();
+  const batchReplicationTreatment = new Set<string>();
+
+  for (const plot of plots) {
+    const title = plot.title;
+    const indexKey = JSON.stringify(plot.plotIndex);
+    const replicationTreatmentKey = `${plot.replication}-${plot.treatment}`;
+
+    if (batchTitles.has(title)) {
+      return `Duplicate plot title in request: ${title}`;
+    }
+    if (batchIndexes.has(indexKey)) {
+      return `Duplicate plotIndex in request: [${plot.plotIndex}]`;
+    }
+    if (batchReplicationTreatment.has(replicationTreatmentKey)) {
+      return `Duplicate replication/treatment combination in request: R${plot.replication}-T${plot.treatment}`;
+    }
+
+    batchTitles.add(title);
+    batchIndexes.add(indexKey);
+    batchReplicationTreatment.add(replicationTreatmentKey);
+
+    if (
+      replicationsLimit < plot.replication ||
+      treatmentsLimit < plot.treatment ||
+      plot.replication < 1 ||
+      plot.treatment < 1
+    ) {
+      return `Invalid ${
+        replicationsLimit < plot.replication ? 'replication' : 'treatment'
+      } number for plot: ${title}`;
+    }
+  }
+
+  return null;
+};
 
 const ProjectStructure = () => {
   const replicationsAndTreatmentsMaxCount = 8;
@@ -36,9 +121,8 @@ const ProjectStructure = () => {
       replication: 2,
     });
 
-  console.log(selectedTreatmentAndReplication, 'selected');
-
-  const [newProject, setnewProject] = useState<Project>();
+  const [plots, setPlots] = useState<Plot[]>([]);
+  const [creationError, setCreationError] = useState('');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   const router = useNavigation<NavigationProp<any>>();
@@ -56,13 +140,31 @@ const ProjectStructure = () => {
   const handleCreateProject = async () => {
     const projectData = useAddNewProjectStore.getState().getProjectData();
     const userId = useAuthStore.getState().user?._id;
-    console.log('Creating project with data:', {
-      ...projectData,
-      userId,
-    });
+    setCreationError('');
+    const showCreationError = (message: string) => {
+      setCreationError(message);
+      Alert.alert('Project creation failed', message);
+    };
 
     if (!userId) {
-      console.error('User ID is missing. Cannot create project.');
+      showCreationError('User is not authenticated.');
+      return;
+    }
+
+    if (!plots.length) {
+      showCreationError('Please configure plots before creating project.');
+      return;
+    }
+
+    const preparedPlots = preparePlotsPayload(plots);
+    const plotValidationError = validatePlotsBeforeCreate(
+      preparedPlots,
+      selectedTreatmentAndReplication.replication,
+      selectedTreatmentAndReplication.treatment,
+    );
+
+    if (plotValidationError) {
+      showCreationError(plotValidationError);
       return;
     }
 
@@ -70,18 +172,63 @@ const ProjectStructure = () => {
     const res = await createProjectService({ ...projectData, userId });
 
     if (res && res.status === 409) {
-      useAddNewProjectStore.getState().setErrorStatus(res.message);
+      const message = res.message || 'Project title already exists';
+      useAddNewProjectStore
+        .getState()
+        .setErrorStatus(message);
+      Alert.alert('Duplicate title', message);
       router.navigate('ProjectTitle');
       setIsCreatingProject(false);
       return;
     }
-    setnewProject(res?.data?.data);
-    setIsCreatingProject(false);
-  };
 
-  useEffect(() => {
-    console.log(newProject, 'newnewProject');
-  }, [newProject]);
+    const createdProjectId = (res as any)?.data?._id || (res as any)?.data?.data?._id;
+    if (!createdProjectId) {
+      const projectErrorMessage = 'message' in res ? res.message : undefined;
+      showCreationError(projectErrorMessage || 'Project creation failed.');
+      setIsCreatingProject(false);
+      return;
+    }
+
+    const plotRes = await createPlotsService({
+      projectId: createdProjectId,
+      userId,
+      plots: preparedPlots as any,
+    });
+
+    setIsCreatingProject(false);
+
+    if (plotRes.status !== 201) {
+      const rollbackRes = await deleteProjectService(createdProjectId, userId);
+      const plotErrorMessage = 'message' in plotRes ? plotRes.message : undefined;
+      const rollbackFailed = rollbackRes.status !== 200;
+      const message =
+        rollbackFailed
+          ? `${plotErrorMessage || 'Plots creation failed.'} Rollback failed. Please delete project manually.`
+          : plotErrorMessage || 'Plots creation failed. Project was rolled back.';
+      showCreationError(message);
+      return;
+    }
+
+    router.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'Main',
+            state: {
+              index: 0,
+              routes: [
+                {
+                  name: 'Projects',
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+  };
 
   return (
     <Screen>
@@ -252,11 +399,14 @@ const ProjectStructure = () => {
                 }
                 replications={selectedTreatmentAndReplication.replication}
                 treatments={selectedTreatmentAndReplication.treatment}
-                projectId={newProject?._id || ''}
+                onPlotsChange={setPlots}
               />
             </ScrollView>
             {isCreatingProject && (
               <LoadingState label="Creating project..." />
+            )}
+            {!!creationError && (
+              <MutedText style={{ color: '#f87171' }}>{creationError}</MutedText>
             )}
           </View>
         </ScrollView>

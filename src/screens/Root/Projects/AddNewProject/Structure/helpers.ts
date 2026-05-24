@@ -84,15 +84,47 @@ export const generatePlots = (
   return result;
 };
 
-export const buildGrid = (plots: Plot[], rows: number, cols: number) => {
-  const grid: (Plot | null)[][] = Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => null),
+export const buildGrid = (
+  plots: Plot[] | undefined | null,
+  rows: number,
+  cols: number,
+) => {
+  const safeRows = Number.isFinite(rows) && rows > 0 ? rows : 0;
+  const safeCols = Number.isFinite(cols) && cols > 0 ? cols : 0;
+  const safePlots = Array.isArray(plots) ? plots : [];
+
+  const grid: (Plot | null)[][] = Array.from({ length: safeRows }, () =>
+    Array.from({ length: safeCols }, () => null),
   );
 
-  plots.forEach(plot => {
+  safePlots.forEach(plot => {
+    if (
+      !Array.isArray(plot.plotIndex) ||
+      plot.plotIndex.length !== 2 ||
+      !Number.isFinite(plot.plotIndex[0]) ||
+      !Number.isFinite(plot.plotIndex[1])
+    ) {
+      console.warn('[buildGrid] Invalid plotIndex:', plot);
+      return;
+    }
+
     const [r, c] = plot.plotIndex;
 
-    if (r < 1 || c < 1 || r > rows || c > cols) {
+    if (r < 1 || c < 1 || r > safeRows || c > safeCols) {
+      console.warn('[buildGrid] plotIndex out of bounds:', plot.plotIndex, {
+        rows: safeRows,
+        cols: safeCols,
+        plot,
+      });
+      return;
+    }
+
+    if (grid[r - 1][c - 1]) {
+      console.warn('[buildGrid] Duplicate physical cell mapping detected:', {
+        plotIndex: plot.plotIndex,
+        existing: grid[r - 1][c - 1],
+        incoming: plot,
+      });
       return;
     }
 

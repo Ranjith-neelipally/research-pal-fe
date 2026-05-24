@@ -79,7 +79,7 @@ const ProjectStructure: React.FC<YourComponentProps> = ({
             flexWrap: 'wrap',
           }}
         >
-          {project?.plotColors.map((color, index) => (
+          {(project?.plotColors || []).map((color, index) => (
             <View
               style={{ alignItems: 'center', flexDirection: 'row', gap: 4 }}
               key={color}

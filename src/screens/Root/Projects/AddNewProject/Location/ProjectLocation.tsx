@@ -24,6 +24,30 @@ import type { NavigationProp } from '@react-navigation/native';
 import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
 import { useStackScreenStore } from '../../../../../services/StackScreen/stackScreen.store';
 
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const getCurrentPosition = (
+  options: {
+    enableHighAccuracy: boolean;
+    timeout: number;
+    maximumAge: number;
+  },
+): Promise<Coordinates> =>
+  new Promise((resolve, reject) => {
+    Geolocation.getCurrentPosition(
+      position =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }),
+      reject,
+      options,
+    );
+  });
+
 const ProjectLocation = () => {
   const router = useNavigation<NavigationProp<any>>();
   const setHeader = useStackScreenStore(state => state.setHeader);
@@ -31,6 +55,7 @@ const ProjectLocation = () => {
 
   const [location, setLocation] = useState<string>('');
   const [loadingLocation, setLoadingLocation] = useState<boolean>(false);
+  const [locationError, setLocationError] = useState<string>('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,12 +69,13 @@ const ProjectLocation = () => {
 
     setShowSuggestions(true);
     setLoadingLocation(true);
+    setLocationError('');
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query.trim())}`,
         {
           headers: {
-            'User-Agent': 'ResearchPal/1.0 (ranjithkrn99@gmail.com)',
+            'User-Agent': 'ResearchPal/1.0 (research-pal)',
             Accept: 'application/json',
           },
         },
@@ -61,8 +87,10 @@ const ProjectLocation = () => {
         setSearchResults([]);
       }
     } catch (error) {
-      console.error('Location search error:', error);
       setSearchResults([]);
+      const message = 'Unable to search location right now.';
+      setLocationError(message);
+      Alert.alert('Location search failed', message);
     } finally {
       setLoadingLocation(false);
     }
@@ -77,78 +105,101 @@ const ProjectLocation = () => {
   }, []);
 
   const requestLocationPermission = async () => {
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'ResearchPal needs access to your location to mark the project location.',
-          buttonPositive: 'Allow',
-          buttonNegative: 'Deny',
-          buttonNeutral: 'Ask Me Later',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    if (Platform.OS !== 'android') {
+      return true;
     }
-    // iOS permission flow handled by Geolocation API by Info.plist declaration
-    return true;
+
+    const finePermission = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    const hasFine = await PermissionsAndroid.check(finePermission);
+    if (hasFine) {
+      return true;
+    }
+
+    const granted = await PermissionsAndroid.request(finePermission, {
+      title: 'Location Permission',
+      message:
+        'ResearchPal needs access to your location to mark the project location.',
+      buttonPositive: 'Allow',
+      buttonNegative: 'Deny',
+      buttonNeutral: 'Ask Me Later',
+    });
+
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
+  const reverseGeocode = async ({ latitude, longitude }: Coordinates) => {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+      {
+        headers: {
+          'User-Agent': 'ResearchPal/1.0 (research-pal)',
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    const geo = await res.json();
+    if (typeof geo?.display_name === 'string' && geo.display_name.trim()) {
+      return geo.display_name.trim();
+    }
+
+    throw new Error('Unable to resolve place name from coordinates.');
+  };
+
+  const fetchReliableCoordinates = async () => {
+    try {
+      return await getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 25000,
+        maximumAge: 0,
+      });
+    } catch (firstError: any) {
+      if (firstError?.code !== 3) {
+        throw firstError;
+      }
+
+      return getCurrentPosition({
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 15000,
+      });
+    }
   };
 
   const handleCurrentLocation = async () => {
     const granted = await requestLocationPermission();
     if (!granted) {
+      setLocationError('Location permission was not granted.');
       Alert.alert('Permission denied', 'Location permission was not granted.');
       return;
     }
 
     setLoadingLocation(true);
-    Geolocation.getCurrentPosition(
-      async position => {
-        const { latitude, longitude } = position.coords;
+    setLocationError('');
 
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
-            {
-              headers: {
-                'User-Agent': 'ResearchPal/1.0 (ranjithkrn99@gmail.com)',
-                Accept: 'application/json',
-              },
-            },
-          );
-
-          const text = await res.text();
-          let geo;
-          try {
-            geo = JSON.parse(text);
-          } catch (parseErr) {
-            console.warn('Reverse geo parse failed, got:', text);
-            throw parseErr;
-          }
-
-          const place = geo?.display_name || `Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`;
-          setLocation(place);
-        } catch (err) {
-          console.error('Reverse geo error:', err);
-          setLocation(`Lat: ${latitude.toFixed(6)}, Lon: ${longitude.toFixed(6)}`);
-        }
-
-        setLoadingLocation(false);
-      },
-        (      error: { message: any; }) => {
-        console.error('Location error:', error);
-        Alert.alert('Location error', error.message || 'Unable to get location');
-        setLoadingLocation(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 10000,
-      },
-    );
+    try {
+      const coordinates = await fetchReliableCoordinates();
+      const place = await reverseGeocode(coordinates);
+      setLocation(place);
+      setShowSuggestions(false);
+      setSearchResults([]);
+    } catch (error: any) {
+      const message = error?.message || 'Unable to get current location.';
+      setLocationError(message);
+      Alert.alert('Location error', message);
+    } finally {
+      setLoadingLocation(false);
+    }
   };
 
   const handleContinue = () => {
+    if (!location.trim()) {
+      const message = 'Location is required to continue.';
+      setLocationError(message);
+      Alert.alert('Location required', message);
+      return;
+    }
+
     router.navigate('ProjectStructure');
   };
 
@@ -178,6 +229,7 @@ const ProjectLocation = () => {
     <TouchableOpacity
       onPress={() => {
         setLocation(item.display_name);
+        setLocationError('');
         setSearchResults([]);
         setShowSuggestions(false);
       }}
@@ -219,6 +271,7 @@ const ProjectLocation = () => {
           <Input
             onChangeText={text => {
               setLocation(text);
+              setLocationError('');
               setShowSuggestions(!!text.trim());
               if (debounceTimeout.current) {
                 clearTimeout(debounceTimeout.current);
@@ -234,6 +287,7 @@ const ProjectLocation = () => {
             value={location || ''}
             placeholder="e.g., Field Station A, Block 3"
             label="Where is this experiment taking place?"
+            error={locationError || undefined}
           />
           <TouchableOpacity
             style={{
@@ -252,10 +306,20 @@ const ProjectLocation = () => {
               }}
             >
               <MutedText style={{ color: Theme.colors.primary }}>
-                {loadingLocation ? 'Getting current location...' : 'Use current location'}
+                {loadingLocation
+                  ? 'Getting current location...'
+                  : 'Use current location'}
               </MutedText>
             </View>
           </TouchableOpacity>
+
+          {!loadingLocation && !!locationError && (
+            <TouchableOpacity onPress={handleCurrentLocation}>
+              <MutedText style={{ marginTop: 8, color: Theme.colors.primary }}>
+                Retry current location
+              </MutedText>
+            </TouchableOpacity>
+          )}
 
           {showSuggestions && (
             <View
@@ -291,7 +355,11 @@ const ProjectLocation = () => {
             </View>
           )}
 
-          <Button disabled={location === ''} onPress={handleContinue} style={{ marginTop: 16 }}>
+          <Button
+            disabled={loadingLocation || location.trim() === ''}
+            onPress={handleContinue}
+            style={{ marginTop: 16 }}
+          >
             Continue
           </Button>
         </View>

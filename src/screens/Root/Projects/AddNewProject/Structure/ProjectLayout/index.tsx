@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
   buildGrid,
   getDefaultPlotName,
@@ -9,7 +9,6 @@ import {
   getTreatmentColor,
   generatePlots,
   Plot,
-  ProjectLayoutPayload,
 } from '../helpers';
 import MyModal from '../../../../../../components/modal';
 import { Theme } from '../../../../../../components/theme';
@@ -19,14 +18,7 @@ import {
 } from '../../../../../../components/commonStyles/styles';
 import Input from '../../../../../../components/Input';
 import Button from '../../../../../../components/Button';
-import { useAuthStore } from '../../../../../../store/auth.store';
 import { useAddNewProjectStore } from '../../../../../../store/Projects/AddNewProject.store';
-import { createPlotsService } from '../../../../../../services/Projects/Plot';
-import {
-  useNavigation,
-  NavigationProp,
-  CommonActions,
-} from '@react-navigation/native';
 import { useStackScreenStore } from '../../../../../../services/StackScreen/stackScreen.store';
 
 interface ProjectLayoutInputProps {
@@ -35,7 +27,7 @@ interface ProjectLayoutInputProps {
   setselectedTreatmentAndReplication?: React.Dispatch<
     React.SetStateAction<{ treatment: number; replication: number }>
   >;
-  projectId: string;
+  onPlotsChange: (plots: Plot[]) => void;
 }
 
 interface PlotData {
@@ -49,7 +41,7 @@ const ProjectLayout = ({
   replications,
   treatments,
   setselectedTreatmentAndReplication,
-  projectId,
+  onPlotsChange,
 }: ProjectLayoutInputProps) => {
   const [plots, setPlots] = useState<Plot[]>([]);
   const setHeader = useStackScreenStore(state => state.setHeader);
@@ -70,10 +62,6 @@ const ProjectLayout = ({
       resetHeader();
     };
   }, [setHeader, resetHeader]);
-  const navigation = useNavigation<NavigationProp<any>>();
-
-  const userId = useAuthStore(state => state.user?._id);
-
   const [selectedPlot, setselectedPlot] = useState<[number, number] | null>(
     null,
   );
@@ -98,7 +86,7 @@ const ProjectLayout = ({
         return existing
           ? {
               ...existing,
-              id: getPlotId(existing.replication, existing.treatment),
+              id: getPlotId(existing.plotIndex[0], existing.plotIndex[1]),
               customName: getPlotCustomName(existing),
               title: getPlotDisplayName(existing),
               color: getTreatmentColor(existing.treatment),
@@ -119,11 +107,9 @@ const ProjectLayout = ({
     });
   }, [replications, setselectedTreatmentAndReplication, treatments]);
 
-  const buildPayload = (): ProjectLayoutPayload => ({
-    projectId,
-    userId,
-    plots,
-  });
+  React.useEffect(() => {
+    onPlotsChange(plots);
+  }, [onPlotsChange, plots]);
 
   const getSelectedPlotObject = () => {
     if (!selectedPlot) {
@@ -139,7 +125,6 @@ const ProjectLayout = ({
 
   const handleOnSave = () => {
     if (!selectedPlot || !selectedPlotData) return;
-
     setPlots(prev =>
       prev.map(plot => {
         const isSelected =
@@ -150,11 +135,11 @@ const ProjectLayout = ({
 
         const newReplication = selectedPlotData.replication;
         const newTreatment = selectedPlotData.treatment;
-
         const customName = selectedPlotData.name?.trim() || undefined;
 
         return {
           ...plot,
+          id: getPlotId(plot.plotIndex[0], plot.plotIndex[1]),
           replication: newReplication,
           treatment: newTreatment,
           title: customName || getDefaultPlotName(newReplication, newTreatment),
@@ -202,7 +187,7 @@ const ProjectLayout = ({
                     : [selectedPlotData.replication, idx + 1];
 
                 setselectedPlotData({
-                  plotIndex: newIndex,
+                  plotIndex: selectedPlotData.plotIndex,
                   replication: newIndex[0],
                   treatment: newIndex[1],
                   name: selectedPlotData.name,
@@ -230,47 +215,17 @@ const ProjectLayout = ({
     );
   };
 
-  const nextProcess = async () => {
-    if (!projectId) return;
-
-    const payload = buildPayload();
-    const res = await createPlotsService(payload);
-    if (res.status === 201) {
-      console.log('Plots created successfully');
-
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'Main',
-              state: {
-                index: 0,
-                routes: [
-                  {
-                    name: 'Projects',
-                  },
-                ],
-              },
-            },
-          ],
-        }),
-      );
-    }
-
-    console.log(payload, 'payload');
-  };
-
-  useEffect(() => {
-    nextProcess();
-  }, [projectId]);
+  console.log({grid})
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       <MyModal
         modalHeader="Configure Plot"
         visible={selectedPlot !== null}
-        onClose={() => setselectedPlot(null)}
+        onClose={() => {
+          setselectedPlot(null);
+          setselectedPlotData(null);
+        }}
       >
         <View>
           <Input

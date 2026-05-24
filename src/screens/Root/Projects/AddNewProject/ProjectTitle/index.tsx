@@ -1,9 +1,9 @@
 import {
   View,
-  Text,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import React, { useLayoutEffect, useState } from 'react';
 import { H3, Screen } from '../../../../../components/commonStyles/styles';
@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
 import { useStackScreenStore } from '../../../../../services/StackScreen/stackScreen.store';
+import { checkProjectTitleExistsService } from '../../../../../services/Projects/Project';
 
 const ProjectTitle = () => {
   const router = useNavigation<NavigationProp<any>>();
@@ -25,13 +26,17 @@ const ProjectTitle = () => {
   const [projectTitle, setProjectTitle] = useState<string>(
     projectTitleFromStore || '',
   );
+  const [isCheckingTitle, setIsCheckingTitle] = useState(false);
 
   const setAddNewProjectTitle = useAddNewProjectStore(state => state.setTitle);
   const errorStatus = useAddNewProjectStore(state => state.errorStatus);
 
   React.useEffect(() => {
     setAddNewProjectTitle(projectTitle);
-  }, [projectTitle]);
+    if (errorStatus) {
+      useAddNewProjectStore.getState().setErrorStatus('');
+    }
+  }, [errorStatus, projectTitle, setAddNewProjectTitle]);
 
   useLayoutEffect(() => {
     setHeader({
@@ -47,7 +52,36 @@ const ProjectTitle = () => {
     };
   }, [setHeader, resetHeader]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    const trimmedTitle = projectTitle.trim();
+    if (!trimmedTitle) {
+      return;
+    }
+
+    setIsCheckingTitle(true);
+    const existsRes = await checkProjectTitleExistsService(trimmedTitle);
+    setIsCheckingTitle(false);
+
+    if (existsRes.status !== 200) {
+      const message =
+        existsRes.message || 'Unable to validate project title. Please try again.';
+      useAddNewProjectStore
+        .getState()
+        .setErrorStatus(message);
+      Alert.alert('Title validation failed', message);
+      return;
+    }
+
+    if ((existsRes.data as any)?.exists) {
+      const message = 'Project title already exists';
+      useAddNewProjectStore
+        .getState()
+        .setErrorStatus(message);
+      Alert.alert('Duplicate title', message);
+      return;
+    }
+
+    useAddNewProjectStore.getState().setErrorStatus('');
     router.navigate('ProjectLocation');
   };
   return (
@@ -85,8 +119,11 @@ const ProjectTitle = () => {
                 error={errorStatus || undefined}
               />
             </View>
-            <Button disabled={projectTitle === ''} onPress={handleContinue}>
-              Continue
+            <Button
+              disabled={projectTitle.trim() === '' || isCheckingTitle}
+              onPress={handleContinue}
+            >
+              {isCheckingTitle ? 'Checking...' : 'Continue'}
             </Button>
           </View>
         </ScrollView>
