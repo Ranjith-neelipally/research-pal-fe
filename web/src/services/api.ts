@@ -1,6 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://research-pal.com/api/";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "researchpal_user";
 

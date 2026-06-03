@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeApiError } from './apiError';
 
 // const API_BASE_URL = 'http://10.252.212.6:1430/';
-const API_BASE_URL = 'https://research-pal.com/api/';
+const API_BASE_URL = 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 let refreshPromise: Promise<string | null> | null = null;
