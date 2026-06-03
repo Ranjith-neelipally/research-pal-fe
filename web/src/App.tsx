@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
 import { Provider } from "react-redux";
 import { AppShell } from "@/components/AppShell";
@@ -35,6 +36,33 @@ setSessionExpiredHandler(() => {
   store.dispatch(clearSession());
 });
 
+const getRouteTitle = (pathname: string) => {
+  if (pathname === "/") return "ResearchPal | Welcome";
+  if (pathname === "/login") return "ResearchPal | Login";
+  if (pathname === "/signup") return "ResearchPal | Sign Up";
+  if (pathname === "/forgot-password") return "ResearchPal | Forgot Password";
+  if (pathname === "/home") return "ResearchPal | Home";
+  if (pathname === "/projects") return "ResearchPal | Projects";
+  if (pathname === "/projects/new") return "ResearchPal | New Project";
+  if (/^\/projects\/[^/]+\/notes\/?$/.test(pathname)) return "ResearchPal | Project Notes";
+  if (/^\/projects\/[^/]+\/plot\/[^/]+\/note\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Edit Note";
+  if (/^\/projects\/[^/]+\/plot\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Plot Notes";
+  if (/^\/projects\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Project Details";
+  if (pathname === "/diary") return "ResearchPal | Diary";
+  if (pathname === "/profile") return "ResearchPal | Profile";
+  return "ResearchPal | Not Found";
+};
+
+const DocumentTitle = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    document.title = getRouteTitle(pathname);
+  }, [pathname]);
+
+  return null;
+};
+
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
@@ -63,6 +91,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <DocumentTitle />
             <AppLayout>
               <Routes>
                 {/* <Route path="/splash" element={<SplashPage />} /> */}

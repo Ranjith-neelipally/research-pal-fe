@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
@@ -34,6 +34,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { logout, selectAuthUser } from "@/store/auth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchProjects, selectProjects, selectProjectsStatus } from "@/store/projects";
 
 type ThemePreference = "dark" | "light" | "auto";
 type UnitPreference = "metric" | "imperial";
@@ -80,20 +81,13 @@ const initialProfile: Profile = {
   },
 };
 
-const stats = {
-  projectsTotal: 12,
-  projectsActive: 8,
-  projectsCompleted: 4,
-  plots: 48,
-  notes: 156,
-  photos: 85,
-};
-
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector(selectAuthUser);
+  const projects = useAppSelector(selectProjects);
+  const projectsStatus = useAppSelector(selectProjectsStatus);
   const { resolvedTheme, setTheme } = useTheme();
   const [profile, setProfile] = useState({
     ...initialProfile,
@@ -103,6 +97,44 @@ const ProfilePage = () => {
     createdAt: authUser?.createdAt || initialProfile.createdAt,
   } satisfies Profile);
   const [editOpen, setEditOpen] = useState(false);
+
+  useEffect(() => {
+    if (projectsStatus === "idle") {
+      dispatch(fetchProjects());
+    }
+  }, [dispatch, projectsStatus]);
+
+  const stats = useMemo(() => {
+    const projectsWithNotes = projects.filter((project) => project.notesCount > 0).length;
+
+    return {
+      projectsTotal: projects.length,
+      projectsWithNotes,
+      projectsWithoutNotes: projects.length - projectsWithNotes,
+      plots: projects.reduce((total, project) => total + project.plotsCount, 0),
+      notes: projects.reduce((total, project) => total + project.notesCount, 0),
+    };
+  }, [projects]);
+
+  const activityData = useMemo(() => {
+    const today = new Date();
+    const days = Array.from({ length: 14 }, (_, index) => {
+      const day = new Date(today);
+      day.setHours(0, 0, 0, 0);
+      day.setDate(today.getDate() - (13 - index));
+      return day;
+    });
+
+    return days.map((day) => {
+      const nextDay = new Date(day);
+      nextDay.setDate(day.getDate() + 1);
+
+      return projects.filter((project) => {
+        const activityAt = new Date(project.updatedAt || project.createdAt);
+        return activityAt >= day && activityAt < nextDay;
+      }).length;
+    });
+  }, [projects]);
 
   const updateProfile = (nextProfile: Partial<Profile>) => {
     setProfile((current) => ({
@@ -190,13 +222,12 @@ const ProfilePage = () => {
           <SectionTitle icon={CheckCircle2}>Research footprint</SectionTitle>
           <div className="mt-4 grid grid-cols-3 gap-2">
             <StatCell label="Projects" value={stats.projectsTotal} />
-            <StatCell label="Active" value={stats.projectsActive} />
-            <StatCell label="Done" value={stats.projectsCompleted} />
+            <StatCell label="With notes" value={stats.projectsWithNotes} />
+            <StatCell label="Empty" value={stats.projectsWithoutNotes} />
             <StatCell label="Plots" value={stats.plots} />
             <StatCell label="Notes" value={stats.notes} />
-            <StatCell label="Photos" value={stats.photos} />
           </div>
-          <Sparkline />
+          <Sparkline data={activityData} />
         </section>
 
         <section className="rounded-3xl border border-border bg-card p-6 md:col-span-2">
@@ -343,9 +374,8 @@ function StatCell({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Sparkline() {
-  const data = useMemo(() => [3, 4, 2, 6, 5, 7, 4, 5, 8, 6, 9, 7, 10, 8], []);
-  const max = Math.max(...data);
+function Sparkline({ data }: { data: number[] }) {
+  const max = Math.max(...data, 1);
 
   return (
     <div className="mt-5">
@@ -356,8 +386,11 @@ function Sparkline() {
         {data.map((value, index) => (
           <div
             key={`${value}-${index}`}
-            className="flex-1 rounded-sm bg-primary/30"
-            style={{ height: `${(value / max) * 100}%` }}
+            className={[
+              "flex-1 rounded-sm",
+              value > 0 ? "bg-primary/30" : "bg-secondary",
+            ].join(" ")}
+            style={{ height: `${Math.max((value / max) * 100, 12)}%` }}
           />
         ))}
       </div>
