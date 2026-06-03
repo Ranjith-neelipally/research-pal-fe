@@ -7,22 +7,22 @@ import { ThemeProvider } from "next-themes";
 import { AppShell } from "@/components/AppShell";
 
 // Pages
-import IntroPage from "./pages/IntroPage";
-import HomePage from "./pages/HomePage";
-import ProjectsPage from "./pages/ProjectsPage";
-import CreateProjectPage from "./pages/CreateProjectPage";
-import ProjectDetailPage from "./pages/ProjectDetailPage";
-import ProjectNotesListPage from "./pages/ProjectNotesListPage";
-import PlotNotesPage from "./pages/PlotNotesPage";
-import EditNotePage from "./pages/EditNotePage";
-import DiaryPage from "./pages/DiaryPage";
-// import PhotosPage from "./pages/PhotosPage";
-import ProfilePage from "./pages/ProfilePage";
-import NotFound from "./pages/NotFound";
-// import SplashPage from "./pages/SplashPage";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import IntroPage from "./screens/Public/Intro";
+import HomePage from "./screens/Root/Home";
+import ProjectsPage from "./screens/Root/Projects";
+import CreateProjectPage from "./screens/Root/Projects/AddNewProject";
+import ProjectDetailPage from "./screens/Root/Projects/ProjectDetails";
+import ProjectNotesListPage from "./screens/Root/Projects/ProjectNotesList";
+import PlotNotesPage from "./screens/Root/Projects/PlotNotes";
+import EditNotePage from "./screens/Root/Projects/ProjectNoteDetails/editor";
+import DiaryPage from "./screens/Root/Diary";
+// import PhotosPage from "./screens/Root/Photos";
+import ProfilePage from "./screens/Root/Profile";
+import NotFound from "./screens/Public/NotFound";
+// import SplashPage from "./screens/Public/Splash";
+import LoginPage from "./screens/Auth/Login";
+import SignupPage from "./screens/Auth/SignUp";
+import ForgotPasswordPage from "./screens/Auth/ForgetPassword";
 
 const queryClient = new QueryClient();
 
