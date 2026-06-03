@@ -4,10 +4,13 @@ import { Leaf, Mail, Lock, Eye, EyeOff, User, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { signup, verifyEmail } from "@/store/auth";
+import { useAppDispatch } from "@/store/hooks";
 
 const SignupPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -17,6 +20,8 @@ const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [showVerification, setShowVerification] = useState(false);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,18 +34,53 @@ const SignupPage = () => {
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
-    // Mock signup - in production, integrate with auth service
-    setTimeout(() => {
+
+    try {
+      await dispatch(
+        signup({
+          email,
+          password,
+          userName: username || `${firstName} ${lastName}`.trim(),
+        }),
+      ).unwrap();
       setIsLoading(false);
       toast({
-        title: "Account created!",
-        description: "Welcome to ResearchPal.",
+        title: "Check your email",
+        description: "Enter the verification code we sent you.",
       });
-      navigate("/");
-    }, 1000);
+      setShowVerification(true);
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Signup failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      await dispatch(verifyEmail({ code: verificationCode })).unwrap();
+      setIsLoading(false);
+      toast({
+        title: "Email verified",
+        description: "You can now sign in.",
+      });
+      navigate("/login");
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -55,7 +95,29 @@ const SignupPage = () => {
           <p className="text-sm text-muted-foreground mt-2">Start your research journey</p>
         </div>
 
-        {/* Form */}
+        {showVerification ? (
+          <form onSubmit={handleVerifyEmail} className="space-y-4 stagger-item" style={{ animationDelay: "100ms" }}>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Verification code</label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="Enter code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                className="h-11 bg-secondary border-border rounded-xl text-sm"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full h-11 rounded-xl text-sm font-medium"
+              disabled={isLoading}
+            >
+              {isLoading ? "Verifying..." : "Verify Email"}
+            </Button>
+          </form>
+        ) : (
         <form onSubmit={handleSignup} className="space-y-3 stagger-item" style={{ animationDelay: "100ms" }}>
           {/* Name Row */}
           <div className="grid grid-cols-2 gap-3">
@@ -171,6 +233,7 @@ const SignupPage = () => {
             {isLoading ? "Creating account..." : "Create Account"}
           </Button>
         </form>
+        )}
 
         {/* Login link */}
         <p className="text-center text-sm text-muted-foreground mt-6 stagger-item" style={{ animationDelay: "200ms" }}>

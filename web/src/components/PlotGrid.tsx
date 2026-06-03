@@ -4,6 +4,13 @@ interface PlotGridProps {
   projectId: string;
   replications: number;
   treatments: number;
+  plots?: Array<{
+    id: string;
+    title: string;
+    color?: string;
+    replication: number;
+    treatment: number;
+  }>;
 }
 
 const plotColors = [
@@ -15,17 +22,20 @@ const plotColors = [
   "bg-plot-6/20 border-plot-6/50 text-plot-6",
 ];
 
-export const PlotGrid = ({ projectId, replications, treatments }: PlotGridProps) => {
+export const PlotGrid = ({ projectId, replications, treatments, plots: providedPlots }: PlotGridProps) => {
   const navigate = useNavigate();
   
-  const plots = [];
-  for (let r = 1; r <= replications; r++) {
-    for (let t = 1; t <= treatments; t++) {
-      plots.push({
-        id: `R${r}_T${t}`,
-        replication: r,
-        treatment: t,
-      });
+  const plots = providedPlots && providedPlots.length > 0 ? providedPlots : [];
+  if (plots.length === 0) {
+    for (let r = 1; r <= replications; r++) {
+      for (let t = 1; t <= treatments; t++) {
+        plots.push({
+          id: `R${r}_T${t}`,
+          title: `R${r}_T${t}`,
+          replication: r,
+          treatment: t,
+        });
+      }
     }
   }
 
@@ -48,10 +58,21 @@ export const PlotGrid = ({ projectId, replications, treatments }: PlotGridProps)
           return (
             <button
               key={plot.id}
-              onClick={() => navigate(`/projects/${projectId}/plot/${plot.id}`)}
+              onClick={() =>
+                navigate(`/projects/${projectId}/plot/${plot.id}?plotTitle=${encodeURIComponent(plot.title)}`)
+              }
               className={`plot-cell border-2 ${colorClass}`}
+              style={
+                plot.color
+                  ? {
+                      backgroundColor: `hsl(${plot.color} / 0.2)`,
+                      borderColor: `hsl(${plot.color} / 0.5)`,
+                      color: `hsl(${plot.color})`,
+                    }
+                  : undefined
+              }
             >
-              {plot.id}
+              {plot.title}
             </button>
           );
         })}

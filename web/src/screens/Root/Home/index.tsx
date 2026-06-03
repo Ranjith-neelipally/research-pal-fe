@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays, CloudSun } from "lucide-react";
 import { format } from "date-fns";
 import { FloatingAdd } from "@/components/FloatingAdd";
@@ -16,50 +16,48 @@ import {
 } from "@/components/ui/dialog";
 import type { Idea } from "@/components/IdeaCard";
 import { useToast } from "@/hooks/use-toast";
-
-const mockIdeas: Idea[] = [
-  {
-    id: "1",
-    content:
-      "Wheat tillers appear denser on north-facing rows. Consider light angle as a factor next cycle.",
-    createdAt: new Date(2026, 5, 1, 9, 37),
-  },
-  {
-    id: "2",
-    content: "Soil moisture meter reads 22% near plot R2_T3 after morning irrigation.",
-    createdAt: new Date(2026, 4, 31, 10, 37),
-  },
-];
+import { createIdea, editIdea, fetchIdeas, selectIdeas, selectIdeasStatus } from "@/store/ideas";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 const HomePage = () => {
   const { toast } = useToast();
-  const [ideas, setIdeas] = useState<Idea[]>(mockIdeas);
+  const dispatch = useAppDispatch();
+  const ideaEntities = useAppSelector(selectIdeas);
+  const ideasStatus = useAppSelector(selectIdeasStatus);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDateNoteOpen, setIsDateNoteOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dateNote, setDateNote] = useState("");
   const today = selectedDate;
+  const ideas: Idea[] = ideaEntities.map((idea) => ({
+    id: idea.id,
+    content: idea.content,
+    createdAt: new Date(idea.createdAt),
+  }));
 
-  const handleCreateIdea = (content: string) => {
-    if (editingIdea) {
-      setIdeas((currentIdeas) =>
-        currentIdeas.map((idea) => (idea.id === editingIdea.id ? { ...idea, content } : idea)),
-      );
-      toast({ title: "Idea updated" });
-      setEditingIdea(null);
-      return;
+  useEffect(() => {
+    dispatch(fetchIdeas({ limit: 15 }));
+  }, [dispatch]);
+
+  const handleCreateIdea = async (content: string) => {
+    try {
+      if (editingIdea) {
+        await dispatch(editIdea({ id: editingIdea.id, content })).unwrap();
+        toast({ title: "Idea updated" });
+        setEditingIdea(null);
+        return;
+      }
+
+      await dispatch(createIdea({ content, date: new Date().toISOString() })).unwrap();
+      toast({ title: "Idea saved" });
+    } catch (error) {
+      toast({
+        title: editingIdea ? "Idea update failed" : "Idea save failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
-
-    setIdeas((currentIdeas) => [
-      {
-        id: Date.now().toString(),
-        content,
-        createdAt: new Date(),
-      },
-      ...currentIdeas,
-    ]);
-    toast({ title: "Idea saved" });
   };
 
   const handleCloseModal = () => {
@@ -67,7 +65,7 @@ const HomePage = () => {
     setEditingIdea(null);
   };
 
-  const handleSaveDateNote = () => {
+  const handleSaveDateNote = async () => {
     const trimmedNote = dateNote.trim();
 
     if (!trimmedNote) {
@@ -79,17 +77,18 @@ const HomePage = () => {
     const now = new Date();
     createdAt.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
-    setIdeas((currentIdeas) => [
-      {
-        id: Date.now().toString(),
-        content: trimmedNote,
-        createdAt,
-      },
-      ...currentIdeas,
-    ]);
-    setDateNote("");
-    setIsDateNoteOpen(false);
-    toast({ title: "Idea saved" });
+    try {
+      await dispatch(createIdea({ content: trimmedNote, date: createdAt.toISOString() })).unwrap();
+      setDateNote("");
+      setIsDateNoteOpen(false);
+      toast({ title: "Idea saved" });
+    } catch (error) {
+      toast({
+        title: "Idea save failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -160,7 +159,15 @@ const HomePage = () => {
             Recent ideas
           </h2>
           <div className="mt-5 grid gap-3 xl:grid-cols-2">
-            {ideas.map((idea) => (
+            {ideasStatus === "loading" ? (
+              <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
+                Loading ideas...
+              </div>
+            ) : ideas.length === 0 ? (
+              <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
+                No ideas yet.
+              </div>
+            ) : ideas.map((idea) => (
               <button
                 key={idea.id}
                 onClick={() => {

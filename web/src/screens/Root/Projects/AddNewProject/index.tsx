@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { MapPin, Grid3X3, Layers, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CreatePlotGrid } from "@/components/CreatePlotGrid";
+import { useToast } from "@/hooks/use-toast";
+import { createProjectWithPlots } from "@/store/projects";
+import { useAppDispatch } from "@/store/hooks";
+import { checkProjectTitleExistsService } from "@/services/projects";
 
 interface PlotData {
   id: string;
@@ -18,7 +22,12 @@ interface TreatmentColor {
 
 const CreateProjectPage = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingTitle, setIsCheckingTitle] = useState(false);
+  const [titleError, setTitleError] = useState("");
   const [projectData, setProjectData] = useState({
     name: "",
     location: "",
@@ -49,12 +58,70 @@ const CreateProjectPage = () => {
     setPlots(newPlots);
   }, [projectData.replications, projectData.treatments]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (step === 1) {
+      const title = projectData.name.trim();
+      if (!title) return;
+
+      setIsCheckingTitle(true);
+      setTitleError("");
+      try {
+        const result = await checkProjectTitleExistsService(title);
+        if (result.exists) {
+          const message = "Project title already exists";
+          setTitleError(message);
+          toast({ title: "Duplicate title", description: message, variant: "destructive" });
+          return;
+        }
+        setStep(2);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setTitleError(message);
+        toast({
+          title: "Title validation failed",
+          description: message || "Unable to validate project title. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsCheckingTitle(false);
+      }
+      return;
+    }
+
     if (step < 3) {
       setStep(step + 1);
     } else {
-      // Create project and navigate
-      navigate("/projects");
+      setIsSaving(true);
+      try {
+        await dispatch(
+          createProjectWithPlots({
+            title: projectData.name.trim(),
+            location: projectData.location.trim(),
+            replications: projectData.replications,
+            treatments: projectData.treatments,
+            plots: plots.map((plot) => ({
+              title: plot.customName.trim() || plot.id,
+              color:
+                treatmentColors.find((item) => item.treatment === plot.treatment)?.color ||
+                `hsl(var(--plot-${((plot.treatment - 1) % 6) + 1}))`,
+              notesCount: 0,
+              replication: plot.replication,
+              treatment: plot.treatment,
+              plotIndex: [plot.replication, plot.treatment],
+            })),
+          }),
+        ).unwrap();
+        toast({ title: "Project created" });
+        navigate("/projects");
+      } catch (error) {
+        toast({
+          title: "Project creation failed",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -121,11 +188,19 @@ const CreateProjectPage = () => {
                 <input
                   type="text"
                   value={projectData.name}
-                  onChange={(e) => setProjectData({ ...projectData, name: e.target.value })}
+                  onChange={(e) => {
+                    setProjectData({ ...projectData, name: e.target.value });
+                    if (titleError) setTitleError("");
+                  }}
                   placeholder="e.g., Wheat Drought Tolerance Study"
-                  className="w-full bg-secondary/50 rounded-2xl p-4 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
+                  className={`w-full bg-secondary/50 rounded-2xl p-4 text-foreground text-sm focus:outline-none focus:ring-2 placeholder:text-muted-foreground ${
+                    titleError ? "ring-2 ring-destructive/60" : "focus:ring-primary/50"
+                  }`}
                   autoFocus
                 />
+                {titleError ? (
+                  <p className="mt-2 text-xs font-medium text-destructive">{titleError}</p>
+                ) : null}
               </div>
             </div>
           )}
@@ -241,14 +316,16 @@ const CreateProjectPage = () => {
           <div className="max-w-md mx-auto">
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isSaving || isCheckingTitle}
               className="w-full h-14 rounded-2xl text-base font-semibold gap-2"
             >
               {step === 3 ? (
                 <>
                   <Check size={20} />
-                  Create Project
+                  {isSaving ? "Creating..." : "Create Project"}
                 </>
+              ) : step === 1 && isCheckingTitle ? (
+                "Checking..."
               ) : (
                 "Continue"
               )}

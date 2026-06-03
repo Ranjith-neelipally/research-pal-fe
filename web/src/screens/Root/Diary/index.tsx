@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Calendar } from "lucide-react";
 import { IdeaCard } from "@/components/IdeaCard";
 import type { Idea } from "@/components/IdeaCard";
@@ -6,53 +6,41 @@ import { FloatingAdd } from "@/components/FloatingAdd";
 import { CreateIdeaModal } from "@/components/CreateIdeaModal";
 import { EmptyState } from "@/components/EmptyState";
 import { format, isToday, isYesterday, startOfDay } from "date-fns";
-
-// Mock data with diary entries
-const mockEntries: Idea[] = [
-  {
-    id: "1",
-    content: "Morning field visit completed. All plots showing healthy growth. Noted slight yellowing in R3 area - possible drainage issue. Will monitor closely.",
-    createdAt: new Date(),
-    images: [
-      "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=200&h=200&fit=crop",
-    ],
-  },
-  {
-    id: "2",
-    content: "Data collection for week 6 completed. All measurements recorded. Preparing summary report for team meeting tomorrow.",
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-  },
-  {
-    id: "3",
-    content: "Irrigation system maintenance. Replaced two drip lines in Section B. System pressure now optimal at 15 PSI.",
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    images: [
-      "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=200&h=200&fit=crop",
-    ],
-  },
-  {
-    id: "4",
-    content: "Weather station calibration complete. Temperature sensors reading accurately. Humidity sensor replaced.",
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: "5",
-    content: "Team meeting notes: Discussed preliminary results. Decision to extend observation period by 2 weeks due to delayed germination in control group.",
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  },
-];
+import { createIdea, fetchIdeas, selectIdeas, selectIdeasStatus } from "@/store/ideas";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { useToast } from "@/hooks/use-toast";
 
 const DiaryPage = () => {
-  const [entries, setEntries] = useState<Idea[]>(mockEntries);
+  const dispatch = useAppDispatch();
+  const { toast } = useToast();
+  const ideaEntities = useAppSelector(selectIdeas);
+  const status = useAppSelector(selectIdeasStatus);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const entries = useMemo<Idea[]>(
+    () =>
+      ideaEntities.map((idea) => ({
+        id: idea.id,
+        content: idea.content,
+        createdAt: new Date(idea.createdAt),
+      })),
+    [ideaEntities],
+  );
 
-  const handleCreateEntry = (content: string) => {
-    const newEntry: Idea = {
-      id: Date.now().toString(),
-      content,
-      createdAt: new Date(),
-    };
-    setEntries([newEntry, ...entries]);
+  useEffect(() => {
+    dispatch(fetchIdeas({ limit: 100 }));
+  }, [dispatch]);
+
+  const handleCreateEntry = async (content: string) => {
+    try {
+      await dispatch(createIdea({ content, date: new Date().toISOString() })).unwrap();
+      toast({ title: "Idea saved" });
+    } catch (error) {
+      toast({
+        title: "Idea save failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   // Group entries by date
@@ -80,7 +68,11 @@ const DiaryPage = () => {
     <div className="mobile-container bg-background">
       <div className="safe-bottom px-4 py-6 space-y-6">
         {/* Entries List */}
-        {entries.length === 0 ? (
+        {status === "loading" ? (
+          <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            Loading ideas...
+          </div>
+        ) : entries.length === 0 ? (
           <EmptyState
             icon={BookOpen}
             title="No diary entries"

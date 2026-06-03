@@ -3,6 +3,7 @@ export interface PlotNote {
   projectId: string;
   projectName?: string;
   plotId: string;
+  plotTitle?: string;
   content: string;
   images: string[];
   createdAt: Date;

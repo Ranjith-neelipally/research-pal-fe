@@ -3,8 +3,13 @@ import { Link } from "react-router-dom";
 import { Leaf, Mail, ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { forgotPassword } from "@/store/auth";
+import { useAppDispatch } from "@/store/hooks";
 
 const ForgotPasswordPage = () => {
+  const dispatch = useAppDispatch();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -12,12 +17,19 @@ const ForgotPasswordPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Mock password reset - in production, integrate with auth service
-    setTimeout(() => {
+
+    try {
+      await dispatch(forgotPassword({ email })).unwrap();
       setIsLoading(false);
       setIsSubmitted(true);
-    }, 1000);
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Reset request failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   return (

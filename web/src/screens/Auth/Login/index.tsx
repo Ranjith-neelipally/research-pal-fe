@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Leaf, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { login } from "@/store/auth";
+import { useAppDispatch } from "@/store/hooks";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,16 +20,24 @@ const LoginPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Mock login - in production, integrate with auth service
-    setTimeout(() => {
+
+    try {
+      await dispatch(login({ email, password })).unwrap();
       setIsLoading(false);
       toast({
         title: "Welcome back!",
         description: "Successfully logged in.",
       });
-      navigate("/");
-    }, 1000);
+      const from = (location.state as { from?: string } | null)?.from || "/home";
+      navigate(from, { replace: true });
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Sign in failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
   };
 
   return (

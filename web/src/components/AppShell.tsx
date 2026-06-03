@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Home, FolderKanban, Lightbulb, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
@@ -38,6 +38,24 @@ function getRouteHeader(pathname: string) {
   );
 }
 
+function getBackTarget(pathname: string) {
+  if (/^\/projects\/new\/?$/.test(pathname)) return "/projects";
+
+  const noteMatch = pathname.match(/^\/projects\/([^/]+)\/plot\/([^/]+)\/note\/[^/]+\/?$/);
+  if (noteMatch) return `/projects/${noteMatch[1]}/plot/${noteMatch[2]}`;
+
+  const plotMatch = pathname.match(/^\/projects\/([^/]+)\/plot\/[^/]+\/?$/);
+  if (plotMatch) return `/projects/${plotMatch[1]}`;
+
+  const notesMatch = pathname.match(/^\/projects\/([^/]+)\/notes\/?$/);
+  if (notesMatch) return `/projects/${notesMatch[1]}`;
+
+  const detailMatch = pathname.match(/^\/projects\/[^/]+\/?$/);
+  if (detailMatch) return "/projects";
+
+  return null;
+}
+
 function NavItem({
   to,
   label,
@@ -72,7 +90,9 @@ function NavItem({
 
 export function AppShell({ children }: { children?: ReactNode }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const header = getRouteHeader(pathname);
+  const backTarget = getBackTarget(pathname);
   const isActive = (to: string) =>
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(to + "/");
 
@@ -99,7 +119,11 @@ export function AppShell({ children }: { children?: ReactNode }) {
       </aside>
 
       <main className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <PageHeader title={header.title} subtitle={header.subtitle} />
+        <PageHeader
+          title={header.title}
+          subtitle={header.subtitle}
+          onBack={backTarget ? () => navigate(backTarget) : undefined}
+        />
         <div className="min-h-0 flex-1 overflow-y-auto pb-24 md:pb-0">
           {children ?? <Outlet />}
         </div>

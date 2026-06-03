@@ -32,6 +32,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { logout, selectAuthUser } from "@/store/auth";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 type ThemePreference = "dark" | "light" | "auto";
 type UnitPreference = "metric" | "imperial";
@@ -90,8 +92,16 @@ const stats = {
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+  const authUser = useAppSelector(selectAuthUser);
   const { resolvedTheme, setTheme } = useTheme();
-  const [profile, setProfile] = useState(initialProfile);
+  const [profile, setProfile] = useState({
+    ...initialProfile,
+    name: authUser?.username || initialProfile.name,
+    email: authUser?.email || initialProfile.email,
+    status: authUser?.verified ? "active" : initialProfile.status,
+    createdAt: authUser?.createdAt || initialProfile.createdAt,
+  } satisfies Profile);
   const [editOpen, setEditOpen] = useState(false);
 
   const updateProfile = (nextProfile: Partial<Profile>) => {
@@ -243,9 +253,10 @@ const ProfilePage = () => {
               icon={LogOut}
               label="Sign out everywhere"
               destructive
-              onClick={() => {
+              onClick={async () => {
+                await dispatch(logout({ fromAll: true }));
                 toast({ title: "Signed out everywhere" });
-                navigate("/login");
+                navigate("/login", { replace: true });
               }}
             />
           </div>

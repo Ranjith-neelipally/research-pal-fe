@@ -7,8 +7,9 @@ export interface Project {
   location: string;
   replications: number;
   treatments: number;
-  createdAt: Date;
+  createdAt: Date | string;
   notesCount: number;
+  plotColors?: string[];
 }
 
 interface ProjectCardProps {
@@ -38,7 +39,7 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
         </span>
         <span className="flex items-center gap-1.5">
           <Calendar size={12} />
-          {format(project.createdAt, "MMM d")}
+          {format(new Date(project.createdAt), "MMM d")}
         </span>
       </div>
       
@@ -49,7 +50,7 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
             key={i} 
             className={`w-4 h-4 rounded-sm bg-plot-${(i % 6) + 1}/30`}
             style={{
-              backgroundColor: `hsl(var(--plot-${(i % 6) + 1}) / 0.3)`,
+              backgroundColor: project.plotColors?.[i] || `hsl(var(--plot-${(i % 6) + 1}) / 0.3)`,
             }}
           />
         ))}
