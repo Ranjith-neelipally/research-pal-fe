@@ -11,13 +11,13 @@ import type { IdeaEntity } from "@/store/ideas/types";
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export const fetchIdeas = createAsyncThunk<
-  { ideas: IdeaEntity[]; date?: string },
+  { ideas: IdeaEntity[]; dates: string[]; date?: string },
   { date?: string; limit?: number; page?: number } | undefined,
   { rejectValue: string }
 >("ideas/fetchIdeas", async (params, { rejectWithValue }) => {
   try {
     const data = await getIdeasService(params);
-    return { ideas: data.ideas.map(mapIdea), date: params?.date };
+    return { ideas: data.ideas.map(mapIdea), dates: data.dates, date: params?.date };
   } catch (error) {
     return rejectWithValue(message(error));
   }

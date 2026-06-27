@@ -18,6 +18,7 @@ import HomePage from "./screens/Root/Home";
 import ProjectsPage from "./screens/Root/Projects";
 import CreateProjectPage from "./screens/Root/Projects/AddNewProject";
 import ProjectDetailPage from "./screens/Root/Projects/ProjectDetails";
+import EditProjectPage from "./screens/Root/Projects/EditProject";
 import ProjectNotesListPage from "./screens/Root/Projects/ProjectNotesList";
 import PlotNotesPage from "./screens/Root/Projects/PlotNotes";
 import EditNotePage from "./screens/Root/Projects/ProjectNoteDetails/editor";
@@ -44,6 +45,7 @@ const getRouteTitle = (pathname: string) => {
   if (pathname === "/home") return "ResearchPal | Home";
   if (pathname === "/projects") return "ResearchPal | Projects";
   if (pathname === "/projects/new") return "ResearchPal | New Project";
+  if (/^\/projects\/[^/]+\/edit\/?$/.test(pathname)) return "ResearchPal | Edit Project";
   if (/^\/projects\/[^/]+\/notes\/?$/.test(pathname)) return "ResearchPal | Project Notes";
   if (/^\/projects\/[^/]+\/plot\/[^/]+\/note\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Edit Note";
   if (/^\/projects\/[^/]+\/plot\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Plot Notes";
@@ -102,6 +104,7 @@ const App = () => (
                 <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
                 <Route path="/projects/new" element={<ProtectedRoute><CreateProjectPage /></ProtectedRoute>} />
+                <Route path="/projects/:id/edit" element={<ProtectedRoute><EditProjectPage /></ProtectedRoute>} />
                 <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/notes" element={<ProtectedRoute><ProjectNotesListPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/plot/:plotId" element={<ProtectedRoute><PlotNotesPage /></ProtectedRoute>} />

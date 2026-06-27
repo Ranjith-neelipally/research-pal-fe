@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 
 interface PlotGridProps {
   projectId: string;
@@ -78,7 +78,6 @@ export const PlotGrid = ({ projectId, replications, treatments, plots: providedP
         })}
       </div>
       
-      {/* Legend */}
       <div className="flex flex-wrap gap-2 mt-4">
         {Array.from({ length: treatments }, (_, i) => (
           <div key={i} className="flex items-center gap-1.5 text-xs">

@@ -5,6 +5,7 @@ import {
   deleteProjectService,
   getProjectsService,
   checkProjectTitleExistsService,
+  updateProjectService,
   type PlotPayload,
 } from "@/services/projects";
 import { mapProject } from "@/store/projects/mappers";
@@ -72,6 +73,29 @@ export const createProjectWithPlots = createAsyncThunk<
     return rejectWithValue(message(error));
   }
 });
+
+export const updateProject = createAsyncThunk<
+  ProjectEntity,
+  { id: string; title: string; location: string; replications: number; treatments: number },
+  { rejectValue: string }
+>("projects/updateProject", async ({ id, ...payload }, { rejectWithValue }) => {
+  try {
+    return mapProject(await updateProjectService({ _id: id, ...payload }));
+  } catch (error) {
+    return rejectWithValue(message(error));
+  }
+});
+
+export const removeProject = createAsyncThunk<string, string, { rejectValue: string }>(
+  "projects/removeProject",
+  async (id, { rejectWithValue }) => {
+    try {
+      return await deleteProjectService(id);
+    } catch (error) {
+      return rejectWithValue(message(error));
+    }
+  },
+);
 
 function validatePlots(plots: PlotPayload[], replicationsLimit: number, treatmentsLimit: number) {
   if (!Array.isArray(plots) || plots.length === 0) return "Please configure plots before creating project.";

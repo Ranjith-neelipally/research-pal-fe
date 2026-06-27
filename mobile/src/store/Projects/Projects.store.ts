@@ -26,6 +26,7 @@ export interface ProjectAction {
 export interface ProjectsState {
   projectsData: Project[];
   setProjectsData: (projects: Project[]) => void;
+  removeProject: (projectId: string) => void;
 }
 
 export interface ProjectsActionState {
@@ -36,6 +37,10 @@ export interface ProjectsActionState {
 export const useProjectsStore = create<ProjectsState>(set => ({
   projectsData: [],
   setProjectsData: projects => set({ projectsData: projects }),
+  removeProject: projectId =>
+    set(state => ({
+      projectsData: state.projectsData.filter(project => project._id !== projectId),
+    })),
 }));
 
 export const useProjectsActionStore = create<ProjectsActionState>(set => ({

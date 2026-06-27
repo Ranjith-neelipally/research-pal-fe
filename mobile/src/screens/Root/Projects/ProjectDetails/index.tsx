@@ -1,6 +1,9 @@
 import { Alert, TouchableOpacity, View } from 'react-native';
 import { useProjectsStore } from '../../../../store/Projects/Projects.store';
-import { getProjectDetailsService } from '../../../../services/Projects/Project';
+import {
+  deleteProjectService,
+  getProjectDetailsService,
+} from '../../../../services/Projects/Project';
 import React, { useCallback, useLayoutEffect, useState } from 'react';
 import {
   H1,
@@ -27,6 +30,7 @@ function ProjectDetails({ route }: any) {
   const { projectId } = route.params;
   const navigation = useNavigation<NavigationProp<any>>();
   const Projects = useProjectsStore(state => state.projectsData);
+  const removeProject = useProjectsStore(state => state.removeProject);
 
   const project = Projects.find(proj => proj._id === projectId);
   const setHeader = useStackScreenStore(state => state.setHeader);
@@ -39,6 +43,7 @@ function ProjectDetails({ route }: any) {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isCalenderVisable, setisCalenderVisable] = useState(false);
   const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(true);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<{
     year: number;
     month: number;
@@ -79,6 +84,34 @@ function ProjectDetails({ route }: any) {
     loadProjectDetails();
   }, [loadProjectDetails]);
 
+  const deleteProject = useCallback(async () => {
+    if (!project || isDeletingProject) return;
+    setIsDeletingProject(true);
+    const response = await deleteProjectService(project._id, project.userId);
+    if (response.status === 200) {
+      removeProject(project._id);
+      navigation.goBack();
+      return;
+    }
+    setIsDeletingProject(false);
+    Alert.alert(
+      'Project deletion failed',
+      (response as any)?.message || 'Unable to delete this project right now.',
+    );
+  }, [isDeletingProject, navigation, project, removeProject]);
+
+  const confirmDeleteProject = useCallback(() => {
+    if (isDeletingProject) return;
+    Alert.alert(
+      'Delete project?',
+      'Deleting this project is permanent and cannot be undone. All project data will be removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete Project', style: 'destructive', onPress: deleteProject },
+      ],
+    );
+  }, [deleteProject, isDeletingProject]);
+
   useLayoutEffect(() => {
     setHeader({
       screenTitle: project?.title,
@@ -98,9 +131,7 @@ function ProjectDetails({ route }: any) {
         {
           icon: 'delete',
           title: 'Delete',
-          onPress: () => {
-            console.log('Delete button pressed');
-          },
+          onPress: confirmDeleteProject,
           varient: 'secondary',
         },
       ],
@@ -113,6 +144,7 @@ function ProjectDetails({ route }: any) {
   }, [
     project?.location,
     project?.title,
+    confirmDeleteProject,
     resetHeader,
     setAddNewButtonActionsVisible,
     setHeader,

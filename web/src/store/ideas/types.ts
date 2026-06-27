@@ -11,4 +11,5 @@ export interface IdeasState {
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
   currentDate: string | null;
+  availableDates: string[];
 }

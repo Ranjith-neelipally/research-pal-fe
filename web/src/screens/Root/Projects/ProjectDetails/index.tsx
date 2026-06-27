@@ -1,13 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Calendar, MapPin } from "lucide-react";
+import { Calendar, MapPin, Pencil, Trash2 } from "lucide-react";
 import { PlotGrid } from "@/components/PlotGrid";
 import { CalendarModal } from "@/components/CalendarModal";
 import { format } from "date-fns";
-import { fetchProjects, selectProjects, selectProjectsStatus } from "@/store/projects";
+import { fetchProjects, removeProject, selectProjects, selectProjectsStatus } from "@/store/projects";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { getPlotsService, type PlotDto } from "@/services/projects";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ProjectDetailPage = () => {
   const navigate = useNavigate();
@@ -20,6 +32,7 @@ const ProjectDetailPage = () => {
   const [plots, setPlots] = useState<PlotDto[]>([]);
   const [datesWithNotes, setDatesWithNotes] = useState<Date[]>([]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (projectsStatus === "idle") {
@@ -56,23 +69,68 @@ const ProjectDetailPage = () => {
   );
 
   const handleDateSelect = (date: Date) => {
-    // Navigate to the notes list page for this date
     const dateStr = format(date, "yyyy-MM-dd");
     navigate(`/projects/${id}/notes?date=${dateStr}`);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!id || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await dispatch(removeProject(id)).unwrap();
+      toast({ title: "Project deleted" });
+      navigate("/projects", { replace: true });
+    } catch (error) {
+      toast({
+        title: "Project deletion failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+      setIsDeleting(false);
+    }
   };
 
   return (
     <div className="mobile-container bg-background min-h-screen">
       <div className="safe-bottom px-4 py-6 space-y-6">
         <section className="glass-card p-4">
-          <h2 className="text-lg font-bold text-foreground">{project?.name || "Project"}</h2>
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin size={10} />
-            <span>{project?.location || "No location"}</span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">{project?.name || "Project"}</h2>
+              <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin size={10} />
+                <span>{project?.location || "No location"}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => navigate(`/projects/${id}/edit`)}>
+                <Pencil className="mr-1.5 h-4 w-4" /> Edit
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="destructive">
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Deleting this project is permanent and cannot be undone. All project data will be removed.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteProject} disabled={isDeleting}>
+                      {isDeleting ? "Deleting..." : "Delete Project"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </section>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3 stagger-item" style={{ animationDelay: "50ms" }}>
           <div className="glass-card p-3 text-center">
             <p className="text-2xl font-bold text-foreground">
@@ -98,7 +156,6 @@ const ProjectDetailPage = () => {
           </button>
         </div>
 
-        {/* Plot Grid */}
         <section className="stagger-item" style={{ animationDelay: "200ms" }}>
           <h2 className="text-base font-semibold text-foreground mb-4">
             Plot Layout
@@ -113,7 +170,6 @@ const ProjectDetailPage = () => {
           </div>
         </section>
 
-        {/* Instructions */}
         <div className="text-center py-4">
           <p className="text-xs text-muted-foreground">
             Tap any plot to view or add notes
@@ -121,7 +177,6 @@ const ProjectDetailPage = () => {
         </div>
       </div>
 
-      {/* Calendar Modal */}
       <CalendarModal
         isOpen={isCalendarOpen}
         onClose={() => setIsCalendarOpen(false)}

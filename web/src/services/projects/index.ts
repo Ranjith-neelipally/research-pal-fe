@@ -82,6 +82,25 @@ export async function checkProjectTitleExistsService(title: string) {
 
 export async function deleteProjectService(projectId: string) {
   await api.delete("/projects", { data: { _id: projectId } });
+  return projectId;
+}
+
+export async function updateProjectService(payload: {
+  _id: string;
+  title: string;
+  location: string;
+  replications: number;
+  treatments: number;
+}) {
+  const response = await api.patch("/projects", payload);
+  const data = unwrap<{ newProject?: ProjectDto }>(response.data);
+  return data.newProject || (response.data as ProjectDto);
+}
+
+export async function renamePlotService(payload: { _id: string; projectId: string; title: string }) {
+  const response = await api.patch("/projects/plot", payload);
+  const data = unwrap<{ plot?: PlotDto }>(response.data);
+  return data.plot || (response.data as PlotDto);
 }
 
 export async function getPlotsService(projectId: string) {

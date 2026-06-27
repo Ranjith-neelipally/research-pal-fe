@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Image as ImageIcon, X, Calendar, HardDrive, FileText, Grid3X3 } from "lucide-react";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import type { Photo } from "@/components/PhotoGrid";
@@ -151,7 +151,6 @@ const PhotosPage = () => {
       {/* Photo Detail Modal */}
       {selectedPhoto && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col animate-fade-in">
-          {/* Header */}
           <div className="flex items-center justify-between p-4">
             <button
               onClick={() => setSelectedPhoto(null)}

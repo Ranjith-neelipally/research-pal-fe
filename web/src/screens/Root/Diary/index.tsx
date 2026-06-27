@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Calendar } from "lucide-react";
 import { IdeaCard } from "@/components/IdeaCard";
 import type { Idea } from "@/components/IdeaCard";
@@ -6,7 +6,7 @@ import { FloatingAdd } from "@/components/FloatingAdd";
 import { CreateIdeaModal } from "@/components/CreateIdeaModal";
 import { EmptyState } from "@/components/EmptyState";
 import { format, isToday, isYesterday, startOfDay } from "date-fns";
-import { createIdea, fetchIdeas, selectIdeas, selectIdeasStatus } from "@/store/ideas";
+import { createIdea, fetchIdeas, removeIdea, selectIdeas, selectIdeasStatus } from "@/store/ideas";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,6 +43,19 @@ const DiaryPage = () => {
     }
   };
 
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      await dispatch(removeIdea(id)).unwrap();
+      toast({ title: "Idea deleted" });
+    } catch (error) {
+      toast({
+        title: "Idea deletion failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
+  };
+
   // Group entries by date
   const groupedEntries = entries.reduce((groups, entry) => {
     const dateKey = startOfDay(entry.createdAt).getTime();
@@ -67,7 +80,6 @@ const DiaryPage = () => {
   return (
     <div className="mobile-container bg-background">
       <div className="safe-bottom px-4 py-6 space-y-6">
-        {/* Entries List */}
         {status === "loading" ? (
           <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
             Loading ideas...
@@ -103,7 +115,7 @@ const DiaryPage = () => {
                       className="stagger-item"
                       style={{ animationDelay: `${(groupIdx * 100) + (idx * 50)}ms` }}
                     >
-                      <IdeaCard idea={entry} />
+                      <IdeaCard idea={entry} onDelete={handleDeleteEntry} />
                     </div>
                   ))}
                 </div>
@@ -113,10 +125,8 @@ const DiaryPage = () => {
         )}
       </div>
 
-      {/* FAB */}
       <FloatingAdd onClick={() => setIsCreateModalOpen(true)} label="Add diary entry" />
 
-      {/* Create Modal */}
       <CreateIdeaModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

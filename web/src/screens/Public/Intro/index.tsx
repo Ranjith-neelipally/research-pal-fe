@@ -1,6 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Leaf, FolderKanban, FileText, Grid3X3, BarChart3, ArrowRight, Check } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const features = [
   {
@@ -33,7 +41,10 @@ const highlights = [
 ];
 
 export default function IntroPage() {
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-[#f0f4f8] via-[#e8eef5] to-[#dce4ed] text-slate-900 dark:from-[hsl(220,20%,6%)] dark:via-[hsl(220,20%,8%)] dark:to-[hsl(220,18%,10%)] dark:text-slate-100">
       {/* Navbar */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-slate-200/60 dark:bg-[hsl(220,18%,12%)]/70 dark:border-white/10">
@@ -258,11 +269,90 @@ export default function IntroPage() {
               ResearchPal
             </span>
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            Field research made simple
-          </p>
+          <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
+            <p>Field research made simple</p>
+            <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
+              |
+            </span>
+            <button
+              type="button"
+              onClick={() => setPrivacyOpen(true)}
+              className="font-medium text-[hsl(142,55%,42%)] transition-colors hover:text-[hsl(142,55%,32%)] dark:text-[hsl(142,55%,52%)] dark:hover:text-[hsl(142,55%,62%)]"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </div>
       </footer>
     </div>
+    <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-[hsl(220,18%,10%)] dark:text-slate-100">
+        <DialogHeader className="pr-8">
+          <DialogTitle className="text-xl">Privacy Policy</DialogTitle>
+          <DialogDescription className="text-sm text-slate-500 dark:text-slate-400">
+            How ResearchPal handles account data, research content, photos, location features, and device information.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Information we collect</h3>
+            <p>
+              We collect account details such as your name, email address, password, and verification status, along with
+              research content you save in the app, including projects, plots, notes, ideas, dates, and photo references.
+            </p>
+            <p>
+              On mobile, photos you capture or choose can be copied into the app’s local storage on your device. The app
+              may also use location features, technical logs, IP address, user-agent, request headers, and error details to
+              support normal operation and troubleshooting.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">How we use information</h3>
+            <p>
+              We use this information to create and secure accounts, store and sync your research data, send verification
+              and password reset emails, support location-based features, and improve the reliability and security of the
+              service.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">How we share information</h3>
+            <p>
+              We do not sell personal information. We may share data with service providers that help us run the app,
+              including email delivery, database hosting, and third-party location or weather services used by specific
+              features.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Storage and security</h3>
+            <p>
+              Passwords are hashed, refresh tokens are stored server-side in hashed form, access tokens are short-lived,
+              and sensitive fields are redacted from error logs where possible. No system is perfectly secure, but we take
+              reasonable steps to protect your information.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Children’s privacy</h3>
+            <p>
+              ResearchPal is intended for adult users and is not directed to children under 13. We do not knowingly
+              collect personal information from children under 13.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Contact</h3>
+            <p>
+              If you have questions about this policy, contact us through the support channel provided with your ResearchPal
+              deployment.
+            </p>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

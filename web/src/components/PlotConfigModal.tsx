@@ -1,4 +1,4 @@
-import {
+﻿import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -125,7 +125,6 @@ export const PlotConfigModal = ({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <Button
               variant="outline"

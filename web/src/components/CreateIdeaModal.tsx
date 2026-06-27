@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { X, Image as ImageIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Idea } from "./IdeaCard";
@@ -48,7 +48,6 @@ export const CreateIdeaModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-fade-in"
         onClick={handleClose}
@@ -61,7 +60,6 @@ export const CreateIdeaModal = ({
           <div className="w-10 h-1 rounded-full bg-muted" />
         </div>
         
-        {/* Header */}
         <div className="flex items-center justify-between px-5 pb-3">
           <h3 className="text-lg font-semibold">
             {editingIdea ? "Edit Idea" : "Quick Idea"}

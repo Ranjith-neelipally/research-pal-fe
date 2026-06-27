@@ -16,19 +16,29 @@ import {
 } from "@/components/ui/dialog";
 import type { Idea } from "@/components/IdeaCard";
 import { useToast } from "@/hooks/use-toast";
-import { createIdea, editIdea, fetchIdeas, selectIdeas, selectIdeasStatus } from "@/store/ideas";
+import {
+  createIdea,
+  editIdea,
+  fetchIdeas,
+  removeIdea,
+  selectIdeaDates,
+  selectIdeas,
+  selectIdeasStatus,
+} from "@/store/ideas";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 const HomePage = () => {
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const ideaEntities = useAppSelector(selectIdeas);
+  const availableDates = useAppSelector(selectIdeaDates);
   const ideasStatus = useAppSelector(selectIdeasStatus);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDateNoteOpen, setIsDateNoteOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dateNote, setDateNote] = useState("");
+  const [selectedIdeaDate, setSelectedIdeaDate] = useState<string | null>(null);
   const today = selectedDate;
   const ideas: Idea[] = ideaEntities.map((idea) => ({
     id: idea.id,
@@ -37,8 +47,26 @@ const HomePage = () => {
   }));
 
   useEffect(() => {
-    dispatch(fetchIdeas({ limit: 15 }));
+    dispatch(fetchIdeas({ limit: 100 }));
   }, [dispatch]);
+
+  const selectIdeaDate = (date: string) => {
+    setSelectedIdeaDate(date);
+    dispatch(fetchIdeas({ date, limit: 100 }));
+  };
+
+  const handleDeleteIdea = async (id: string) => {
+    try {
+      await dispatch(removeIdea(id)).unwrap();
+      toast({ title: "Idea deleted" });
+    } catch (error) {
+      toast({
+        title: "Idea deletion failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleCreateIdea = async (content: string) => {
     try {
@@ -155,32 +183,67 @@ const HomePage = () => {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-wrap gap-2">
+            {availableDates.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No idea dates available.</span>
+            ) : availableDates.map((date) => (
+              <button
+                key={date}
+                onClick={() => selectIdeaDate(date)}
+                className={[
+                  "rounded-lg border px-3 py-2 text-sm transition-colors",
+                  selectedIdeaDate === date
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                {format(new Date(`${date}T00:00:00`), "MMM d, yyyy")}
+              </button>
+            ))}
+          </div>
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Recent ideas
+            {selectedIdeaDate
+              ? ` - ${format(new Date(`${selectedIdeaDate}T00:00:00`), "MMM d, yyyy")}`
+              : ""}
           </h2>
           <div className="mt-5 grid gap-3 xl:grid-cols-2">
-            {ideasStatus === "loading" ? (
+            {!selectedIdeaDate ? (
+              <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
+                Select a date to view its ideas.
+              </div>
+            ) : ideasStatus === "loading" ? (
               <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
                 Loading ideas...
               </div>
             ) : ideas.length === 0 ? (
               <div className="rounded-3xl border border-border bg-card p-5 text-sm text-muted-foreground">
-                No ideas yet.
+                No ideas exist for this date.
               </div>
             ) : ideas.map((idea) => (
-              <button
+              <div
                 key={idea.id}
                 onClick={() => {
                   setEditingIdea(idea);
                   setIsCreateModalOpen(true);
                 }}
-                className="rounded-3xl border border-border bg-card p-5 text-left transition-colors hover:bg-surface-elevated"
+                className="cursor-pointer rounded-3xl border border-border bg-card p-5 text-left transition-colors hover:bg-surface-elevated"
               >
                 <div className="text-xs text-muted-foreground">
                   {format(idea.createdAt, "MMM d · h:mm a")}
                 </div>
                 <p className="mt-4 text-sm font-medium leading-6 text-foreground">{idea.content}</p>
-              </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteIdea(idea.id);
+                  }}
+                  className="mt-4 text-xs font-medium text-destructive"
+                >
+                  Delete
+                </button>
+              </div>
             ))}
           </div>
         </section>

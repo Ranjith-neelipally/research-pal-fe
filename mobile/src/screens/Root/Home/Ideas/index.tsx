@@ -1,4 +1,4 @@
-import {
+﻿import {
   View,
   ScrollView,
   Pressable,
@@ -44,7 +44,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NoteInterface } from '../../Diary';
 
 const Ideas = () => {
-  /* -------------------- AUTH & DATE -------------------- */
   const getUserId = useAuthStore.getState().getUserId;
   const userId = getUserId();
 
@@ -52,23 +51,19 @@ const Ideas = () => {
   const [currentDate, setCurrentDate] = useState(today);
   const [selectedDate, setSelectedDate] = useState(today);
 
-  /* -------------------- UI STATE -------------------- */
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [noteAction, setNoteAction] = useState<'add' | 'edit' | null>(null);
   const [menuTop, setMenuTop] = useState<number | null>(null);
 
-  /* -------------------- DATA STATE -------------------- */
   const [notes, setNotes] = useState<QuickNote[]>([]);
   const [editingNote, setEditingNote] = useState<QuickNote | null>(null);
   const [draft, setDraft] = useState('');
 
-  /* -------------------- REFS for measuring -------------------- */
   const containerRef = useRef<View | null>(null);
   const itemRefs = useRef<Record<string, any>>({});
 
-  /* -------------------- ADD BUTTON -------------------- */
   const setAddNewButtonVisible = useAddNewButtonActionsStore(
     state => state.setAddNewButtonActionsVisible,
   );
@@ -76,7 +71,6 @@ const Ideas = () => {
     state => state.setAddNewButtonAction,
   );
 
-  /* -------------------- FETCH NOTES -------------------- */
   const fetchNotes = useCallback(async (date: string) => {
     if (!userId) return;
 
@@ -91,7 +85,6 @@ const Ideas = () => {
     }
   }, [userId]);
 
-  /* -------------------- EFFECTS -------------------- */
   useEffect(() => {
     setAddNewButtonVisible(true);
   }, [setAddNewButtonVisible]);
@@ -120,7 +113,6 @@ const Ideas = () => {
     return () => sub.remove();
   }, [openMenuId]);
 
-  /* -------------------- DATE CHANGE -------------------- */
   const changeDate = (days: number) => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + days);
@@ -128,7 +120,6 @@ const Ideas = () => {
     setCurrentDate(formatted);
   };
 
-  /* -------------------- measure & open menu -------------------- */
   const openMenuForNote = async (noteId: string) => {
     const itemRef = itemRefs.current[noteId];
     const container = containerRef.current;
@@ -173,12 +164,10 @@ const Ideas = () => {
     }
   };
 
-  /* -------------------- ACTIONS -------------------- */
   const handleSave = async () => {
     if (!userId) return;
 
     setIsSubmitting(true);
-    // -------- ADD --------
     if (noteAction === 'add') {
       await addQuickNoteService({
         userId,
@@ -186,19 +175,17 @@ const Ideas = () => {
         date: selectedDate,
       });
 
-      // 🔥 Sync screen with newly added note date
+      // ðŸ”¥ Sync screen with newly added note date
       setCurrentDate(selectedDate);
     }
 
-    // -------- EDIT --------
     if (noteAction === 'edit' && editingNote) {
       await updateQuickNotes(userId, editingNote._id, draft);
 
-      // 🔥 Refresh currently visible date
+      // ðŸ”¥ Refresh currently visible date
       fetchNotes(currentDate);
     }
 
-    // -------- CLEANUP --------
     setDraft('');
     setEditingNote(null);
     setNoteAction(null);
@@ -220,10 +207,8 @@ const Ideas = () => {
     setOpenMenuId(null);
   };
 
-  /* -------------------- RENDER -------------------- */
   return (
     <View style={{ flex: 1, gap: 16 }}>
-      {/* HEADER */}
       <ActivitiesHeaderContainer>
         <StyledButton onPress={() => changeDate(-1)}>
           <ChevronLeft size={16} color={Theme.colors.mutedForeground} />
@@ -238,7 +223,6 @@ const Ideas = () => {
 
       {/* Wrap ScrollView + overlays so we can measure relative positions */}
       <View style={{ flex: 1 }} ref={containerRef}>
-        {/* LIST */}
         <ScrollView showsVerticalScrollIndicator={false}>
           {isLoading ? (
             <MutedText>Loading...</MutedText>
@@ -279,7 +263,6 @@ const Ideas = () => {
           )}
         </ScrollView>
 
-        {/* BACKDROP */}
         {openMenuId && (
           <Pressable
             onPress={() => setOpenMenuId(null)}
@@ -294,7 +277,6 @@ const Ideas = () => {
           />
         )}
 
-        {/* MENU */}
         {openMenuId !== null &&
           menuTop !== null &&
           (() => {

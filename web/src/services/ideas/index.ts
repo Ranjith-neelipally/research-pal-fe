@@ -17,9 +17,10 @@ const unwrap = <T>(payload: unknown): T => {
 
 export async function getIdeasService(params: { date?: string; limit?: number; page?: number } = {}) {
   const response = await api.get("/ideas", { params });
-  const data = unwrap<{ userIdeas?: IdeaDto[]; page?: number; limit?: number }>(response.data);
+  const data = unwrap<{ userIdeas?: IdeaDto[]; dates?: string[]; page?: number; limit?: number }>(response.data);
   return {
     ideas: data.userIdeas || [],
+    dates: data.dates || [],
     page: data.page || params.page || 1,
     limit: data.limit || params.limit || 15,
   };

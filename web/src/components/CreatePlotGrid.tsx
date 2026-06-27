@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { PlotConfigModal } from "./PlotConfigModal";
 import { Palette, Lock } from "lucide-react";
 import {
@@ -111,7 +111,6 @@ export const CreatePlotGrid = ({
 
   return (
     <div className="space-y-4">
-      {/* Treatment Color Controls */}
       <div className="glass-card p-3">
         <p className="text-xs text-muted-foreground mb-2">Treatment Colors</p>
         <div className="flex flex-wrap gap-2">
@@ -174,13 +173,11 @@ export const CreatePlotGrid = ({
         </div>
       </div>
 
-      {/* Grid Info */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{replications} Replications</span>
         <span>{treatments} Treatments</span>
       </div>
 
-      {/* Interactive Plot Grid */}
       <div
         className="grid gap-2"
         style={{
@@ -210,7 +207,6 @@ export const CreatePlotGrid = ({
         })}
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-2 mt-4">
         {Array.from({ length: treatments }, (_, i) => i + 1).map((t) => {
           const color = getTreatmentColor(t);
@@ -230,7 +226,6 @@ export const CreatePlotGrid = ({
         Tap any plot to configure
       </p>
 
-      {/* Plot Config Modal */}
       <PlotConfigModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}

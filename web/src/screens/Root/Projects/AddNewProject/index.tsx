@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Grid3X3, Layers, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createProjectWithPlots } from "@/store/projects";
 import { useAppDispatch } from "@/store/hooks";
 import { checkProjectTitleExistsService } from "@/services/projects";
+import { ProjectLocationPicker } from "@/components/ProjectLocationPicker";
 
 interface PlotData {
   id: string;
@@ -159,7 +160,6 @@ const CreateProjectPage = () => {
           </button>
         </div>
 
-        {/* Progress bar */}
         <div className="flex gap-2">
           {[1, 2, 3].map((s) => (
             <div
@@ -171,7 +171,6 @@ const CreateProjectPage = () => {
           ))}
         </div>
 
-        {/* Step content */}
         <div className="pt-4 animate-fade-in">
           {step === 1 && (
             <div className="space-y-6">
@@ -217,18 +216,10 @@ const CreateProjectPage = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Where is this experiment taking place?
                 </p>
-                <input
-                  type="text"
+                <ProjectLocationPicker
                   value={projectData.location}
-                  onChange={(e) => setProjectData({ ...projectData, location: e.target.value })}
-                  placeholder="e.g., Field Station A, Block 3"
-                  className="w-full bg-secondary/50 rounded-2xl p-4 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
-                  autoFocus
+                  onChange={(location) => setProjectData({ ...projectData, location })}
                 />
-                <button className="mt-3 text-sm text-primary flex items-center gap-2">
-                  <MapPin size={14} />
-                  Use current location
-                </button>
               </div>
             </div>
           )}
@@ -247,7 +238,6 @@ const CreateProjectPage = () => {
                 </p>
 
                 <div className="space-y-6">
-                  {/* Replications */}
                   <div>
                     <label className="text-sm font-medium text-foreground mb-3 block">
                       Replications
@@ -269,7 +259,6 @@ const CreateProjectPage = () => {
                     </div>
                   </div>
 
-                  {/* Treatments */}
                   <div>
                     <label className="text-sm font-medium text-foreground mb-3 block">
                       Treatments
@@ -291,7 +280,6 @@ const CreateProjectPage = () => {
                     </div>
                   </div>
 
-                  {/* Interactive Plot Grid */}
                   <div className="pt-2">
                     <p className="text-sm font-medium text-foreground mb-3">
                       Plot Grid ({projectData.replications * projectData.treatments} plots)
@@ -311,7 +299,6 @@ const CreateProjectPage = () => {
           )}
         </div>
 
-        {/* Bottom action */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
           <div className="max-w-md mx-auto">
             <Button

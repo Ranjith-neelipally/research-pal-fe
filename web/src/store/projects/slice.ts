@@ -1,6 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { ProjectsState } from "@/store/projects/types";
-import { createProjectWithPlots, fetchProjects } from "@/store/projects/thunks";
+import { createProjectWithPlots, fetchProjects, removeProject, updateProject } from "@/store/projects/thunks";
 
 const initialState: ProjectsState = {
   items: [],
@@ -28,6 +28,14 @@ const projectsSlice = createSlice({
       })
       .addCase(createProjectWithPlots.fulfilled, (state, action) => {
         state.items = [action.payload, ...state.items.filter((project) => project.id !== action.payload.id)];
+      })
+      .addCase(updateProject.fulfilled, (state, action) => {
+        state.items = state.items.map((project) =>
+          project.id === action.payload.id ? action.payload : project,
+        );
+      })
+      .addCase(removeProject.fulfilled, (state, action) => {
+        state.items = state.items.filter((project) => project.id !== action.payload);
       });
   },
 });

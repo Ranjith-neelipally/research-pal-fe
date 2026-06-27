@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 
@@ -34,7 +34,6 @@ export const CalendarModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
@@ -42,7 +41,6 @@ export const CalendarModal = ({
       
       {/* Modal */}
       <div className="relative w-full max-w-sm bg-card border border-border rounded-3xl p-5 animate-scale-in">
-        {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <button
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
