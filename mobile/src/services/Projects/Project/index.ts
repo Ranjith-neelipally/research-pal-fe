@@ -57,19 +57,43 @@ export async function createProjectService(projectData: Partial<Project>) {
 
 export async function deleteProjectService(
   projectId: string,
-  userId?: string,
+  _userId?: string,
 ) {
   try {
     const res = await api.delete('/projects', {
       data: {
         _id: projectId,
-        userId,
       },
     });
 
     return {
       status: res.status,
       data: res.data?.data || res.data,
+    };
+  } catch (error) {
+    const parsed = normalizeApiError(error);
+    return {
+      status: parsed.status || 500,
+      message: parsed.message,
+    };
+  }
+}
+
+export async function updateProjectService(project: Project) {
+  try {
+    const res = await api.patch('/projects', {
+      _id: project._id,
+      title: project.title,
+      location: project.location,
+      replications: project.replicationsCount,
+      treatments: project.treatmentsCount,
+    });
+    const payload = res.data?.data || res.data;
+    const updatedProject = payload?.newProject || payload;
+
+    return {
+      status: res.status,
+      data: updatedProject as Project,
     };
   } catch (error) {
     const parsed = normalizeApiError(error);

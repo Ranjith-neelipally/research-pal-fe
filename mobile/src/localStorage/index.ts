@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import RNFS from 'react-native-fs';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { executeSyncSql } from '../sync/sqlite/database';
 
 export interface StoredPhoto {
   id: string;
@@ -53,6 +54,64 @@ const getPhotoById = async (id: string): Promise<StoredPhoto | null> => {
       ? new Date(stat.mtime).toISOString()
       : new Date().toISOString(),
   };
+};
+
+export const cleanupProjectLocalData = async (
+  projectId: string,
+): Promise<void> => {
+  const notes = await executeSyncSql(
+    'SELECT id, photo_ids_json FROM notes WHERE project_id = ?',
+    [projectId],
+  );
+  const photoIds = new Set<string>();
+
+  for (let index = 0; index < notes.rows.length; index += 1) {
+    const row = notes.rows.item(index) as {
+      id: string;
+      photo_ids_json?: string | null;
+    };
+    try {
+      const ids = JSON.parse(row.photo_ids_json || '[]');
+      if (Array.isArray(ids)) {
+        ids.forEach(id => typeof id === 'string' && photoIds.add(id));
+      }
+    } catch {
+      // A malformed legacy photo list must not prevent the remaining cleanup.
+    }
+    await executeSyncSql(
+      "DELETE FROM outbox_ops WHERE entity_type = 'note' AND entity_id = ?",
+      [row.id],
+    );
+  }
+
+  const plots = await executeSyncSql(
+    'SELECT id FROM plots WHERE project_id = ?',
+    [projectId],
+  );
+  for (let index = 0; index < plots.rows.length; index += 1) {
+    const row = plots.rows.item(index) as { id: string };
+    await executeSyncSql(
+      "DELETE FROM outbox_ops WHERE entity_type = 'plot' AND entity_id = ?",
+      [row.id],
+    );
+  }
+
+  await executeSyncSql('DELETE FROM notes WHERE project_id = ?', [projectId]);
+  await executeSyncSql('DELETE FROM plots WHERE project_id = ?', [projectId]);
+  await executeSyncSql('DELETE FROM projects WHERE id = ?', [projectId]);
+  await executeSyncSql(
+    "DELETE FROM outbox_ops WHERE entity_type = 'project' AND entity_id = ?",
+    [projectId],
+  );
+
+  await Promise.all(
+    Array.from(photoIds).map(async id => {
+      const path = `${APP_PHOTO_DIR}/${id}.jpg`;
+      if (await RNFS.exists(path)) {
+        await RNFS.unlink(path);
+      }
+    }),
+  );
 };
 
 export const usePhotoStorage = () => {
