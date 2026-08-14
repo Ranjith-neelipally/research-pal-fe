@@ -9,8 +9,8 @@ import { Provider } from "react-redux";
 import { AppShell } from "@/components/AppShell";
 import { store } from "@/store";
 import { useAppSelector } from "@/store/hooks";
-import { clearSession, selectAuthUser } from "@/store/auth";
-import { setSessionExpiredHandler } from "@/services/api";
+import { clearSession, selectAuthUser, setAccessToken } from "@/store/auth";
+import { setAccessTokenUpdatedHandler, setSessionExpiredHandler } from "@/services/api";
 
 // Pages
 import IntroPage from "./screens/Public/Intro";
@@ -18,6 +18,7 @@ import HomePage from "./screens/Root/Home";
 import ProjectsPage from "./screens/Root/Projects";
 import CreateProjectPage from "./screens/Root/Projects/AddNewProject";
 import ProjectDetailPage from "./screens/Root/Projects/ProjectDetails";
+import ObservationDetailsPage from "./screens/Root/Projects/ObservationDetails";
 import EditProjectPage from "./screens/Root/Projects/EditProject";
 import ProjectNotesListPage from "./screens/Root/Projects/ProjectNotesList";
 import PlotNotesPage from "./screens/Root/Projects/PlotNotes";
@@ -36,6 +37,9 @@ const queryClient = new QueryClient();
 setSessionExpiredHandler(() => {
   store.dispatch(clearSession());
 });
+setAccessTokenUpdatedHandler((token) => {
+  store.dispatch(setAccessToken(token));
+});
 
 const getRouteTitle = (pathname: string) => {
   if (pathname === "/") return "ResearchPal | Welcome";
@@ -47,6 +51,7 @@ const getRouteTitle = (pathname: string) => {
   if (pathname === "/projects/new") return "ResearchPal | New Project";
   if (/^\/projects\/[^/]+\/edit\/?$/.test(pathname)) return "ResearchPal | Edit Project";
   if (/^\/projects\/[^/]+\/notes\/?$/.test(pathname)) return "ResearchPal | Project Notes";
+  if (/^\/projects\/[^/]+\/observations\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Observation";
   if (/^\/projects\/[^/]+\/plot\/[^/]+\/note\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Edit Note";
   if (/^\/projects\/[^/]+\/plot\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Plot Notes";
   if (/^\/projects\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Project Details";
@@ -92,7 +97,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_relativeSplatPath: true }}>
             <DocumentTitle />
             <AppLayout>
               <Routes>
@@ -106,6 +111,7 @@ const App = () => (
                 <Route path="/projects/new" element={<ProtectedRoute><CreateProjectPage /></ProtectedRoute>} />
                 <Route path="/projects/:id/edit" element={<ProtectedRoute><EditProjectPage /></ProtectedRoute>} />
                 <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetailPage /></ProtectedRoute>} />
+                <Route path="/projects/:projectId/observations/:typeId" element={<ProtectedRoute><ObservationDetailsPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/notes" element={<ProtectedRoute><ProjectNotesListPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/plot/:plotId" element={<ProtectedRoute><PlotNotesPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/plot/:plotId/note/:noteId" element={<ProtectedRoute><EditNotePage /></ProtectedRoute>} />

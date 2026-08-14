@@ -20,6 +20,7 @@ const routeHeaders = [
   },
   { match: /^\/projects\/new\/?$/, title: "New Project", subtitle: "Create a structured research project" },
   { match: /^\/projects\/[^/]+\/notes\/?$/, title: "Project Notes", subtitle: "Date-wise observations and notes" },
+  { match: /^\/projects\/[^/]+\/observations\/[^/]+\/?$/, title: "Observation", subtitle: "Structured field data" },
   { match: /^\/projects\/[^/]+\/plot\/[^/]+\/note\/[^/]+\/?$/, title: "Edit Note", subtitle: "Update your plot observation" },
   { match: /^\/projects\/[^/]+\/plot\/[^/]+\/?$/, title: "Plot Notes", subtitle: "Observations for this plot" },
   { match: /^\/projects\/[^/]+\/?$/, title: "Project Details", subtitle: "Plots, treatments, and observations" },
@@ -49,6 +50,8 @@ function getBackTarget(pathname: string) {
 
   const notesMatch = pathname.match(/^\/projects\/([^/]+)\/notes\/?$/);
   if (notesMatch) return `/projects/${notesMatch[1]}`;
+  const observationMatch = pathname.match(/^\/projects\/([^/]+)\/observations\/[^/]+\/?$/);
+  if (observationMatch) return `/projects/${observationMatch[1]}`;
 
   const detailMatch = pathname.match(/^\/projects\/[^/]+\/?$/);
   if (detailMatch) return "/projects";

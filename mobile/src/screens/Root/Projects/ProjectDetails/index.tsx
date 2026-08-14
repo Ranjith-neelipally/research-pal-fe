@@ -25,10 +25,14 @@ import ProjectStructure from './ProjectStructure';
 import MyModal from '../../../../components/modal';
 import CustomCalendar from '../../../../components/Calender';
 import LoadingState from '../../../../components/LoadingState';
+import QuickObservationModal from '../Observations/QuickObservationModal';
+import AddNew from '../../../../components/AddNew';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function ProjectDetails({ route }: any) {
   const { projectId } = route.params;
   const navigation = useNavigation<NavigationProp<any>>();
+  const insets = useSafeAreaInsets();
   const Projects = useProjectsStore(state => state.projectsData);
   const removeProject = useProjectsStore(state => state.removeProject);
 
@@ -44,6 +48,7 @@ function ProjectDetails({ route }: any) {
   const [isCalenderVisable, setisCalenderVisable] = useState(false);
   const [isLoadingProjectDetails, setIsLoadingProjectDetails] = useState(true);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [isQuickObservationVisible, setIsQuickObservationVisible] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<{
     year: number;
     month: number;
@@ -83,6 +88,24 @@ function ProjectDetails({ route }: any) {
   React.useEffect(() => {
     loadProjectDetails();
   }, [loadProjectDetails]);
+
+  React.useEffect(() => {
+    const projectsTabNavigation = navigation.getParent();
+
+    setAddNewButtonActionsVisible(false);
+    const unsubscribeFocus = projectsTabNavigation?.addListener('focus', () => {
+      setAddNewButtonActionsVisible(false);
+    });
+    const unsubscribeBlur = projectsTabNavigation?.addListener('blur', () => {
+      setAddNewButtonActionsVisible(true);
+    });
+
+    return () => {
+      unsubscribeFocus?.();
+      unsubscribeBlur?.();
+      setAddNewButtonActionsVisible(true);
+    };
+  }, [navigation, setAddNewButtonActionsVisible]);
 
   const deleteProject = useCallback(async () => {
     if (!project || isDeletingProject) return;
@@ -136,8 +159,6 @@ function ProjectDetails({ route }: any) {
         },
       ],
     });
-    setAddNewButtonActionsVisible(false);
-
     return () => {
       resetHeader();
     };
@@ -146,7 +167,6 @@ function ProjectDetails({ route }: any) {
     project?.title,
     confirmDeleteProject,
     resetHeader,
-    setAddNewButtonActionsVisible,
     setHeader,
   ]);
 
@@ -259,6 +279,22 @@ function ProjectDetails({ route }: any) {
         project={project}
         grid={grid}
         handlePlotPress={handlePlotPress}
+      />
+      <AddNew
+        floating
+        bottomOffset={112 + insets.bottom}
+        onPress={() => setIsQuickObservationVisible(true)}
+      />
+      <QuickObservationModal
+        visible={isQuickObservationVisible}
+        projectId={projectId}
+        plots={plotsData}
+        onClose={() => setIsQuickObservationVisible(false)}
+        onSaved={loadProjectDetails}
+        onViewObservation={type => {
+          setIsQuickObservationVisible(false);
+          navigation.navigate('ObservationDetails', { projectId, observationType: type });
+        }}
       />
       <MyModal
         visible={isCalenderVisable}

@@ -6,6 +6,8 @@ interface User {
   email: string;
   verified: boolean;
   token: string;
+  profession?: string;
+  createdAt?: string;
 }
 
 interface AuthState {

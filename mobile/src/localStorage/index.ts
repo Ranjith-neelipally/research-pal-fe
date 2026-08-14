@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import RNFS from 'react-native-fs';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { executeSyncSql } from '../sync/sqlite/database';
+import { getDeviceStorageInfo } from '../services/deviceStorage';
 
 export interface StoredPhoto {
   id: string;
@@ -12,6 +13,27 @@ export interface StoredPhoto {
 }
 
 const APP_PHOTO_DIR = `${RNFS.DocumentDirectoryPath}/photos`;
+
+export const getAttachedPhotoStorageStats = async () => {
+  const directoryExists = await RNFS.exists(APP_PHOTO_DIR);
+  const storedFiles = directoryExists
+    ? (await RNFS.readDir(APP_PHOTO_DIR)).filter(entry => entry.isFile())
+    : [];
+  let usedBytes = 0;
+  for (const file of storedFiles) {
+    const stat = await RNFS.stat(file.path);
+    usedBytes += Number(stat.size || 0);
+  }
+
+  let allowanceBytes: number | null = null;
+  try {
+    const { totalBytes } = await getDeviceStorageInfo();
+    allowanceBytes = totalBytes * 0.2;
+  } catch (error) {
+    if (__DEV__) console.error('Unable to read Android device storage', error);
+  }
+  return { photoCount: storedFiles.length, usedBytes, allowanceBytes };
+};
 
 const ensurePhotoDir = async (): Promise<void> => {
   const exists = await RNFS.exists(APP_PHOTO_DIR);

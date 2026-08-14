@@ -17,6 +17,8 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { Theme } from '../../../../components/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTO_WEATHER_KEY } from '../../../../services/settings';
 
 type Units = {
   tempParam: 'celsius' | 'fahrenheit';
@@ -142,6 +144,7 @@ export default function WeatherModal() {
   const [loc, setLoc] = useState<LocationInfo | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [autoWeather, setAutoWeather] = useState<boolean | null>(null);
 
   const units = useMemo<Units>(
     () => pickUnitsByCountry(loc?.countryCode ?? 'US'),
@@ -149,6 +152,15 @@ export default function WeatherModal() {
   );
 
   useEffect(() => {
+    AsyncStorage.getItem(AUTO_WEATHER_KEY).then(value => setAutoWeather(value !== 'false'));
+  }, []);
+
+  useEffect(() => {
+    if (autoWeather === null) return;
+    if (!autoWeather) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const locRes = await fetch('https://ipwho.is/');
@@ -200,7 +212,7 @@ export default function WeatherModal() {
         setLoading(false);
       }
     })();
-  }, [units.tempParam, units.windParam, units.precipParam]);
+  }, [autoWeather, units.tempParam, units.windParam, units.precipParam]);
 
   console.log(weather, 'weather data');
 
@@ -211,6 +223,10 @@ export default function WeatherModal() {
         <Text>Loading weather…</Text>
       </View>
     );
+  }
+
+  if (!autoWeather) {
+    return <View><Text>Auto Weather off</Text></View>;
   }
 
   if (!weather || !loc) {

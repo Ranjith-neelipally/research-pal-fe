@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
+import React from 'react';
 
 import { useAuthStore } from '../../store/auth.store';
 
@@ -7,11 +8,13 @@ import AuthNavigator from '../AuthNavigator';
 import RootNavigator from '../RootNavigator';
 import ProjectsNavigator from '../ProjectsNavigator';
 import { refreshSession } from '../../services/login';
+import SettingsScreen from '../../screens/Root/Settings';
 
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   ProjectCreation: undefined;
+  Settings: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -25,9 +28,12 @@ function MainNavigator() {
 
   useEffect(() => {
     const bootstrapAuth = async () => {
-      await refreshSession();
-
-      setHydrated(true);
+      try {
+        await refreshSession();
+      } finally {
+        if (__DEV__) console.log('[auth] hydration completed');
+        setHydrated(true);
+      }
     };
 
     bootstrapAuth();
@@ -39,12 +45,17 @@ function MainNavigator() {
 
   return (
     <RootStack.Navigator
-      initialRouteName={isLoggedIn ? 'Main' : 'Auth'}
       screenOptions={{ headerShown: false }}
     >
-      <RootStack.Screen name="Auth" component={AuthNavigator} />
-      <RootStack.Screen name="Main" component={RootNavigator} />
-      <RootStack.Screen name="ProjectCreation" component={ProjectsNavigator} />
+      {isLoggedIn ? (
+        <>
+          <RootStack.Screen name="Main" component={RootNavigator} />
+          <RootStack.Screen name="ProjectCreation" component={ProjectsNavigator} />
+          <RootStack.Screen name="Settings" component={SettingsScreen} />
+        </>
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+      )}
     </RootStack.Navigator>
   );
 }

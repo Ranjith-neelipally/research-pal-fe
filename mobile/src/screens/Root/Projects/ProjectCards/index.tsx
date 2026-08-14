@@ -36,6 +36,7 @@ import MyModal from '../../../../components/modal';
 import Input from '../../../../components/Input';
 import Button from '../../../../components/Button';
 import { cleanupProjectLocalData } from '../../../../localStorage';
+import { TreatmentColors } from '../AddNewProject/Structure/helpers';
 
 const MENU_WIDTH = 172;
 const MENU_HEIGHT = 96;
@@ -267,15 +268,19 @@ const ProjectsData = () => {
                       <View
                         style={{
                           flexDirection: 'row',
-                          alignItems: 'baseline',
+                          alignItems: 'flex-start',
                           gap: 4,
+                          flex: 1,
                         }}
                       >
                         <MapPin
                           size={12}
                           color={Theme.colors.mutedForeground}
+                          style={{ marginTop: 3 }}
                         />
-                        <SmallMutedText>{project.location}</SmallMutedText>
+                        <SmallMutedText style={{ flex: 1 }}>
+                          {project.location}
+                        </SmallMutedText>
                       </View>
                       <View
                         style={{
@@ -308,9 +313,12 @@ const ProjectsData = () => {
                     <View
                       style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}
                     >
-                      {(project.plotColors || []).map(color => (
+                      {(project.plotColors?.length
+                        ? project.plotColors
+                        : TreatmentColors.slice(0, project.treatmentsCount)
+                      ).map((color, index) => (
                         <View
-                          key={color}
+                          key={`${color}-${index}`}
                           style={{
                             width: 20,
                             height: 20,

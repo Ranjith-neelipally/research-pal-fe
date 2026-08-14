@@ -1,4 +1,4 @@
-import { View, Text } from 'react-native';
+import { Pressable, View } from 'react-native';
 import React from 'react';
 import {
   CardContainer,
@@ -8,13 +8,25 @@ import {
 } from '../../../../components/Card/styles';
 import { Calendar } from 'lucide-react-native';
 import { Theme } from '../../../../components/theme';
-import { useDateStore } from '../../../../store/date.store';
 import WeatherModal from '../WeatherModal';
 import { H1, MutedText } from '../../../../components/commonStyles/styles';
 
-const DateWeatherCard = () => {
-  const { currentDay, currentDayNumber, currentMonth, currentYear } =
-    useDateStore();
+interface DateWeatherCardProps {
+  selectedDate: string;
+  onOpenCalendar: () => void;
+}
+
+const parseLocalDate = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const DateWeatherCard = ({ selectedDate, onOpenCalendar }: DateWeatherCardProps) => {
+  const date = parseLocalDate(selectedDate);
+  const currentDay = date.toLocaleDateString(undefined, { weekday: 'long' });
+  const currentMonth = date.toLocaleDateString(undefined, { month: 'long' });
+  const currentDayNumber = String(date.getDate()).padStart(2, '0');
+  const currentYear = String(date.getFullYear());
   return (
     <View>
       <CardContainer
@@ -39,9 +51,13 @@ const DateWeatherCard = () => {
             <WeatherModal />
           </View>
         </View>
-        <View style={{ alignItems: 'center' }}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenCalendar}
+          style={{ alignItems: 'center', paddingVertical: 8 }}
+        >
           <MutedText>Tap to view calendar</MutedText>
-        </View>
+        </Pressable>
       </CardContainer>
     </View>
   );

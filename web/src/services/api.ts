@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
 // const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "researchpal_user";
@@ -9,9 +10,14 @@ type RetryRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 let refreshPromise: Promise<string | null> | null = null;
 let sessionExpiredHandler: (() => void) | null = null;
+let accessTokenUpdatedHandler: ((token: string) => void) | null = null;
 
 export function setSessionExpiredHandler(handler: () => void) {
   sessionExpiredHandler = handler;
+}
+
+export function setAccessTokenUpdatedHandler(handler: (token: string) => void) {
+  accessTokenUpdatedHandler = handler;
 }
 
 function getStoredAccessToken() {
@@ -29,6 +35,19 @@ function setStoredAccessToken(token: string, refreshToken: string) {
   const user = raw ? JSON.parse(raw) : {};
   localStorage.setItem(USER_KEY, JSON.stringify({ ...user, token }));
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  accessTokenUpdatedHandler?.(token);
+}
+
+function tokenNeedsRefresh(token: string | null) {
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    ) as { exp?: number };
+    return !payload.exp || payload.exp * 1000 <= Date.now() + 15_000;
+  } catch {
+    return true;
+  }
 }
 
 function clearStoredSession() {
@@ -42,7 +61,9 @@ function apiMessage(error: AxiosError) {
     | { error?: { message?: string }; message?: string }
     | undefined;
 
-  return data?.error?.message || data?.message || error.message || "Request failed.";
+  return (
+    data?.error?.message || data?.message || error.message || "Request failed."
+  );
 }
 
 async function refreshAccessToken() {
@@ -56,7 +77,9 @@ async function refreshAccessToken() {
       }
 
       try {
-        const response = await axios.post(`${API_BASE_URL}auth/refresh`, { refreshToken });
+        const response = await axios.post(`${API_BASE_URL}auth/refresh`, {
+          refreshToken,
+        });
         const responseData = response.data?.data || response.data;
         const nextAccessToken = responseData.accessToken || responseData.token;
         const nextRefreshToken = responseData.refreshToken;
@@ -85,11 +108,25 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000,
+  timeout: 20000,
 });
 
-api.interceptors.request.use((config) => {
-  const token = getStoredAccessToken();
+api.interceptors.request.use(async (config) => {
+  const url = config.url || "";
+  const isAuthRequest =
+    url.includes("/auth/login") ||
+    url.includes("/auth/sign-in") ||
+    url.includes("/auth/signup") ||
+    url.includes("/auth/refresh");
+  let token = getStoredAccessToken();
+
+  if (
+    !isAuthRequest &&
+    tokenNeedsRefresh(token) &&
+    localStorage.getItem(REFRESH_TOKEN_KEY)
+  ) {
+    token = await refreshAccessToken();
+  }
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

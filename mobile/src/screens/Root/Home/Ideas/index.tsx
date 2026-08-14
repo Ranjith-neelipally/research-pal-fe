@@ -2,11 +2,9 @@
   View,
   ScrollView,
   Pressable,
-  TouchableWithoutFeedback,
   BackHandler,
 } from 'react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useDateStore } from '../../../../store/date.store';
 import {
   H3,
   MutedText,
@@ -16,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   EllipsisVertical,
-  X,
 } from 'lucide-react-native';
 import { Theme } from '../../../../components/theme';
 import {
@@ -27,39 +24,55 @@ import {
 } from './styles';
 import { QuickNote } from '../../../../store/notes.store';
 import {
-  addQuickNoteService,
   deleteQuickNotes,
   getQuickNotesService,
-  updateQuickNotes,
 } from '../../../../services/quickNotes';
 import { useAuthStore } from '../../../../store/auth.store';
-import { getDayLabel } from '../../../../utils/common';
 import { useAddNewButtonActionsStore } from '../../../../store/addNew.store';
-import MyModal from '../../../../components/modal';
-import CustomCalendar from '../../../../components/Calender';
 import { Card } from '../../../../components/Card/styles';
-import Input from '../../../../components/Input';
-import Button from '../../../../components/Button';
 import { useFocusEffect } from '@react-navigation/native';
 import { NoteInterface } from '../../Diary';
+import QuickIdeaEditor from '../../../../components/QuickIdeaEditor';
+import { cancelIdeaReminders } from '../../../../services/ideaReminders';
 
-const Ideas = () => {
+interface IdeasProps {
+  selectedDate: string;
+  onSelectedDateChange: (date: string) => void;
+}
+
+const parseLocalDate = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const toLocalDateString = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const getIdeasHeading = (selectedDate: string) => {
+  const selected = parseLocalDate(selectedDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const difference = Math.round((selected.getTime() - today.getTime()) / 86400000);
+
+  if (difference === 0) return 'Ideas from Today';
+  if (difference === -1) return 'Ideas from Yesterday';
+  if (difference === 1) return 'Ideas for Tomorrow';
+
+  const label = selected.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return difference < 0 ? `Ideas from ${label}` : `Ideas for ${label}`;
+};
+
+const Ideas = ({ selectedDate, onSelectedDateChange }: IdeasProps) => {
   const getUserId = useAuthStore.getState().getUserId;
   const userId = getUserId();
 
-  const today = useDateStore().currentDate;
-  const [currentDate, setCurrentDate] = useState(today);
-  const [selectedDate, setSelectedDate] = useState(today);
-
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [noteAction, setNoteAction] = useState<'add' | 'edit' | null>(null);
   const [menuTop, setMenuTop] = useState<number | null>(null);
 
   const [notes, setNotes] = useState<QuickNote[]>([]);
   const [editingNote, setEditingNote] = useState<QuickNote | null>(null);
-  const [draft, setDraft] = useState('');
 
   const containerRef = useRef<View | null>(null);
   const itemRefs = useRef<Record<string, any>>({});
@@ -90,14 +103,15 @@ const Ideas = () => {
   }, [setAddNewButtonVisible]);
 
   useEffect(() => {
-    fetchNotes(currentDate);
+    fetchNotes(selectedDate);
     setOpenMenuId(null);
-  }, [currentDate, fetchNotes]);
+  }, [selectedDate, fetchNotes]);
 
   useFocusEffect(
     useCallback(() => {
       setAddNewButtonAction(() => setNoteAction('add'));
-    }, [setAddNewButtonAction]),
+      fetchNotes(selectedDate);
+    }, [fetchNotes, selectedDate, setAddNewButtonAction]),
   );
 
   useEffect(() => {
@@ -114,15 +128,24 @@ const Ideas = () => {
   }, [openMenuId]);
 
   const changeDate = (days: number) => {
-    const d = new Date(currentDate);
+    const d = parseLocalDate(selectedDate);
     d.setDate(d.getDate() + days);
-    const formatted = d.toISOString().split('T')[0];
-    setCurrentDate(formatted);
+    onSelectedDateChange(toLocalDateString(d));
   };
 
-  const openMenuForNote = async (noteId: string) => {
+  const openMenuForNote = async (noteId: string, pageY?: number) => {
     const itemRef = itemRefs.current[noteId];
     const container = containerRef.current;
+    if (container && pageY !== undefined && Number.isFinite(pageY)) {
+      (container as any).measureInWindow(
+        (_x: number, containerY: number) => {
+          const relativeTop = pageY - containerY + 16;
+          setMenuTop(Number.isFinite(relativeTop) ? Math.max(0, relativeTop) : 0);
+          setOpenMenuId(noteId);
+        },
+      );
+      return;
+    }
     if (!itemRef || !container) {
       // fallback: open menu at top
       setMenuTop(0);
@@ -155,7 +178,11 @@ const Ideas = () => {
       // compute top relative to container, place menu below the card
       const topRelativeToContainer =
         itemLayout.y - containerLayout.y + itemLayout.height;
-      setMenuTop(topRelativeToContainer);
+      setMenuTop(
+        Number.isFinite(topRelativeToContainer)
+          ? Math.max(0, topRelativeToContainer)
+          : 0,
+      );
       setOpenMenuId(noteId);
     } catch {
       // fallback
@@ -164,45 +191,15 @@ const Ideas = () => {
     }
   };
 
-  const handleSave = async () => {
-    if (!userId) return;
-
-    setIsSubmitting(true);
-    if (noteAction === 'add') {
-      await addQuickNoteService({
-        userId,
-        idea: draft,
-        date: selectedDate,
-      });
-
-      // ðŸ”¥ Sync screen with newly added note date
-      setCurrentDate(selectedDate);
-    }
-
-    if (noteAction === 'edit' && editingNote) {
-      await updateQuickNotes(userId, editingNote._id, draft);
-
-      // ðŸ”¥ Refresh currently visible date
-      fetchNotes(currentDate);
-    }
-
-    setDraft('');
-    setEditingNote(null);
-    setNoteAction(null);
-    setIsSubmitting(false);
-  };
-
   const handleDelete = async (note: QuickNote) => {
     if (!userId) return;
-    setIsSubmitting(true);
+    await cancelIdeaReminders(note._id);
     await deleteQuickNotes({ userId, _id: note._id });
-    fetchNotes(currentDate);
-    setIsSubmitting(false);
+    fetchNotes(selectedDate);
   };
 
   const handleEdit = (note: NoteInterface) => {
     setEditingNote(note);
-    setDraft(note.idea);
     setNoteAction('edit');
     setOpenMenuId(null);
   };
@@ -214,7 +211,7 @@ const Ideas = () => {
           <ChevronLeft size={16} color={Theme.colors.mutedForeground} />
         </StyledButton>
 
-        <H3>Ideas from {getDayLabel(currentDate)}</H3>
+        <H3>{getIdeasHeading(selectedDate)}</H3>
 
         <StyledButton onPress={() => changeDate(1)}>
           <ChevronRight size={16} color={Theme.colors.mutedForeground} />
@@ -223,11 +220,15 @@ const Ideas = () => {
 
       {/* Wrap ScrollView + overlays so we can measure relative positions */}
       <View style={{ flex: 1 }} ref={containerRef}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 150 }}
+          onScrollBeginDrag={() => setOpenMenuId(null)}
+        >
           {isLoading ? (
             <MutedText>Loading...</MutedText>
           ) : notes.length === 0 ? (
-            <MutedText>No Notes Found on {currentDate}</MutedText>
+            <MutedText>No ideas found for this date</MutedText>
           ) : (
             notes.map(note => (
               <View
@@ -251,19 +252,27 @@ const Ideas = () => {
                     <TextSecondary numberOfLines={2}>{note.idea}</TextSecondary>
 
                     <Pressable
-                      onPress={() => openMenuForNote(note._id)}
+                      onPress={event => openMenuForNote(note._id, event.nativeEvent.pageY)}
                       style={{ padding: 4 }}
                     >
                       <EllipsisVertical size={12} color="#fff" />
                     </Pressable>
                   </View>
                 </Card>
+                {openMenuId === note._id && (
+                  <View style={{ position: 'absolute', right: 8, top: 32, zIndex: 20, elevation: 20 }}>
+                    <MoreOptionsCard>
+                      <MoreOption onPress={() => handleEdit(note as NoteInterface)}><MutedText>Edit</MutedText></MoreOption>
+                      <MoreOption onPress={() => { handleDelete(note); setOpenMenuId(null); }}><MutedText>Delete</MutedText></MoreOption>
+                    </MoreOptionsCard>
+                  </View>
+                )}
               </View>
             ))
           )}
         </ScrollView>
 
-        {openMenuId && (
+        {false && openMenuId && (
           <Pressable
             onPress={() => setOpenMenuId(null)}
             style={{
@@ -277,8 +286,9 @@ const Ideas = () => {
           />
         )}
 
-        {openMenuId !== null &&
+        {false && openMenuId !== null &&
           menuTop !== null &&
+          Number.isFinite(menuTop) &&
           (() => {
             const note = notes.find(n => n._id === openMenuId);
             if (!note) return null;
@@ -288,7 +298,7 @@ const Ideas = () => {
                 style={{
                   position: 'absolute',
                   right: 0,
-                  top: menuTop - 20, // small visual offset for spacing (ok)
+                  top: Math.max(0, menuTop - 20),
                   zIndex: 3,
                   elevation: 10,
                 }}
@@ -317,53 +327,13 @@ const Ideas = () => {
           })()}
       </View>
 
-      <MyModal
-        visible={noteAction !== null}
-        onClose={() => setNoteAction(null)}
-        placement="bottom"
-      >
-        <View style={{ gap: 16 }}>
-          {noteAction === 'add' && (
-            <CustomCalendar
-              selectedDate={selectedDate}
-              onDayPress={d => setSelectedDate(d.dateString)}
-            />
-          )}
-
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <H3>Quick Idea</H3>
-            <TouchableWithoutFeedback onPress={() => setNoteAction(null)}>
-              <X size={16} color={Theme.colors.mutedForeground} />
-            </TouchableWithoutFeedback>
-          </View>
-
-          <Input
-            placeholder="Capture your thought..."
-            numberOfLines={3}
-            value={draft}
-            onChangeText={setDraft}
-          />
-
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <MutedText>{draft.length}/200</MutedText>
-            <Button variant="rounded" onPress={handleSave} disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </Button>
-          </View>
-        </View>
-      </MyModal>
+      {userId && <QuickIdeaEditor visible={noteAction !== null} userId={userId} initialDate={selectedDate} note={noteAction === 'edit' ? editingNote : null} onClose={() => { setNoteAction(null); setEditingNote(null); }} onSaved={saved => {
+        if (!saved || saved.date === selectedDate) {
+          fetchNotes(selectedDate);
+          return;
+        }
+        onSelectedDateChange(saved.date);
+      }} />}
     </View>
   );
 };

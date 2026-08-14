@@ -8,6 +8,7 @@ import ProjectDetails from '../../screens/Root/Projects/ProjectDetails';
 import ProjectsHeader from '../ProjectsNavigator/ProjectsHeader';
 import PlotNotesDetails from '../../screens/Root/Projects/ProjectNoteDetails';
 import PlotNoteEditorScreen from '../../screens/Root/Projects/ProjectNoteDetails/editor';
+import ObservationDetails from '../../screens/Root/Projects/Observations/ObservationDetails';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -38,6 +39,12 @@ function ProjectsStackNavigator() {
       <Stack.Screen
         name="PlotNoteEditor"
         component={PlotNoteEditorScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name="ObservationDetails"
+        component={ObservationDetails}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

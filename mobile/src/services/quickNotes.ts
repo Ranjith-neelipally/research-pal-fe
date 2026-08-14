@@ -10,11 +10,19 @@ const serviceError = (error: unknown) => {
   };
 };
 
-export async function addQuickNoteService(idea: {
+export interface QuickNoteMutation {
   userId: string;
   date: string;
   idea: string;
-}) {
+  reminderEnabled?: boolean;
+  reminderTime?: string | null;
+  projectId?: string | null;
+  plotId?: string | null;
+  completed?: boolean;
+  notificationIds?: number[];
+}
+
+export async function addQuickNoteService(idea: QuickNoteMutation) {
   try {
     const res = await api.post('/ideas', idea);
     return {
@@ -62,9 +70,10 @@ export async function updateQuickNotes(
   userId: string,
   noteId: string,
   note: string,
+  fields: Partial<Omit<QuickNoteMutation, 'userId' | 'idea'>> = {},
 ) {
   try {
-    const res = await api.patch(`/ideas`, { idea: note, userId, _id: noteId });
+    const res = await api.patch(`/ideas`, { idea: note, userId, _id: noteId, ...fields });
     return {
       status: res.status,
       data: res.data?.data || res.data,

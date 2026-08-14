@@ -7,6 +7,12 @@ export interface QuickNote {
   createdAt: string;
   updatedAt: string;
   date: string;
+  reminderEnabled?: boolean;
+  reminderTime?: string | null;
+  projectId?: string | null;
+  plotId?: string | null;
+  completed?: boolean;
+  notificationIds?: number[];
   serverVersion?: number;
   lastModifiedByDeviceId?: string;
   syncedAt?: string | null;

@@ -2,12 +2,9 @@ import {
   View,
   ScrollView,
   Pressable,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
-  H1,
-  H3,
   MutedText,
   Screen,
   TextSecondary,
@@ -24,27 +21,18 @@ import {
   EllipsisVertical,
   PlusCircle,
   RefreshCcw,
-  X,
 } from 'lucide-react-native';
-import CustomCalendar from '../../../components/Calender';
-import Input from '../../../components/Input';
-import MyModal from '../../../components/modal';
 import { Theme } from '../../../components/theme';
-import Button from '../../../components/Button';
 import { useDateStore } from '../../../store/date.store';
 import { MoreOptionsCard, MoreOption } from '../Home/Ideas/styles';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAddNewButtonActionsStore } from '../../../store/addNew.store';
 import ScreenHeader from '../../../components/ScreenHeader';
+import QuickIdeaEditor from '../../../components/QuickIdeaEditor';
+import { QuickNote } from '../../../store/notes.store';
+import { cancelIdeaReminders } from '../../../services/ideaReminders';
 
-export interface NoteInterface {
-  _id: string;
-  userId: string;
-  idea: string;
-  date: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export interface NoteInterface extends QuickNote {}
 
 const Diary = () => {
   const PAGE_SIZE = 15;
@@ -56,12 +44,12 @@ const Diary = () => {
 
   const [notes, setNotes] = useState<NoteInterface[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [_isSubmitting, setIsSubmitting] = useState(false);
 
   const [action, setAction] = useState<'add' | 'edit' | null>(null);
   const [draft, setDraft] = useState('');
   const [editingNote, setEditingNote] = useState<NoteInterface | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(today);
+  const [selectedDate, _setSelectedDate] = useState<string | null>(today);
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuTop, setMenuTop] = useState<number | null>(null);
@@ -132,7 +120,7 @@ const Diary = () => {
     }, [setAddNewButtonAction]),
   );
 
-  const handleSave = async () => {
+  const _handleSave = async () => {
     if (!userId || !selectedDate) return;
 
     setIsSubmitting(true);
@@ -159,6 +147,7 @@ const Diary = () => {
     setAction(null);
     setIsSubmitting(false);
   };
+  void _handleSave;
 
   const handleEdit = (note: NoteInterface) => {
     setEditingNote(note);
@@ -170,9 +159,17 @@ const Diary = () => {
   const handleDelete = async (note: NoteInterface) => {
     if (!userId) return;
     setIsLoading(true);
+    await cancelIdeaReminders(note._id);
     await deleteQuickNotes({ userId, _id: note._id });
     setIsLoading(false);
     fetchNotes();
+  };
+
+  const handleDone = async (note: NoteInterface) => {
+    if (!userId || note.completed) return;
+    await cancelIdeaReminders(note._id);
+    await updateQuickNotes(userId, note._id, note.idea, { completed: true, notificationIds: [] });
+    fetchNotes(1, true);
   };
 
   const isSameDay = (a: Date, b: Date) =>
@@ -221,8 +218,18 @@ const Diary = () => {
 
   const groupedNotes = groupNotesByDate(sortedNotes);
 
-  const openMenuForNote = async (noteId: string) => {
+  const openMenuForNote = async (noteId: string, pageY?: number) => {
     const itemRef = itemRefs.current[noteId];
+    if (containerRef.current && pageY !== undefined && Number.isFinite(pageY)) {
+      (containerRef.current as any).measureInWindow(
+        (_x: number, containerY: number) => {
+          const relativeTop = pageY - containerY + 16;
+          setMenuTop(Number.isFinite(relativeTop) ? Math.max(0, relativeTop) : 0);
+          setOpenMenuId(noteId);
+        },
+      );
+      return;
+    }
     if (!itemRef || !containerRef.current) {
       setMenuTop(0);
       setOpenMenuId(noteId);
@@ -254,7 +261,11 @@ const Diary = () => {
       const topRelativeToContainer =
         itemLayout.y - containerLayout.y + itemLayout.height;
 
-      setMenuTop(topRelativeToContainer);
+      setMenuTop(
+        Number.isFinite(topRelativeToContainer)
+          ? Math.max(0, topRelativeToContainer)
+          : 0,
+      );
       setOpenMenuId(noteId);
     } catch {
       setMenuTop(0);
@@ -312,6 +323,8 @@ const Diary = () => {
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 150 }}
+          onScrollBeginDrag={() => setOpenMenuId(null)}
           onScroll={({ nativeEvent }) => {
             const { layoutMeasurement, contentOffset, contentSize } =
               nativeEvent;
@@ -356,15 +369,16 @@ const Diary = () => {
                         <View
                           style={{ flex: 1, flexDirection: 'column', gap: 4 }}
                         >
-                          <TextSecondary style={{ flex: 1 }}>
+                          <TextSecondary style={{ flex: 1, opacity: note.completed ? 0.55 : 1, textDecorationLine: note.completed ? 'line-through' : 'none' }}>
                             {note.idea}
                           </TextSecondary>
+                          {note.completed && <MutedText>Done</MutedText>}
                           <MutedText>{getNoteTimestamp(note)}</MutedText>
                         </View>
 
                         <Pressable
-                          onPress={() => {
-                            openMenuForNote(note._id);
+                          onPress={event => {
+                            openMenuForNote(note._id, event.nativeEvent.pageY);
                           }}
                           style={{ padding: 4 }}
                         >
@@ -372,6 +386,15 @@ const Diary = () => {
                         </Pressable>
                       </View>
                     </Card>
+                    {openMenuId === note._id && (
+                      <View style={{ position: 'absolute', right: 8, top: 32, zIndex: 20, elevation: 20 }}>
+                        <MoreOptionsCard>
+                          {note.reminderEnabled && !note.completed && <MoreOption onPress={() => { handleDone(note); setOpenMenuId(null); }}><MutedText>Mark as done</MutedText></MoreOption>}
+                          <MoreOption onPress={() => handleEdit(note)}><MutedText>Edit</MutedText></MoreOption>
+                          <MoreOption onPress={() => { handleDelete(note); setOpenMenuId(null); }}><MutedText>Delete</MutedText></MoreOption>
+                        </MoreOptionsCard>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -384,7 +407,7 @@ const Diary = () => {
           </MutedText>
         )}
 
-        {openMenuId && (
+        {false && openMenuId && (
           <Pressable
             onPress={() => setOpenMenuId(null)}
             style={{
@@ -398,8 +421,9 @@ const Diary = () => {
           />
         )}
 
-        {openMenuId !== null &&
+        {false && openMenuId !== null &&
           menuTop !== null &&
+          Number.isFinite(menuTop) &&
           (() => {
             const note = notes.find(n => n._id === openMenuId);
             if (!note) return null;
@@ -409,12 +433,13 @@ const Diary = () => {
                 style={{
                   position: 'absolute',
                   right: 0,
-                  top: menuTop - 20,
+                  top: Math.max(0, menuTop - 20),
                   zIndex: 3,
                   elevation: 10,
                 }}
               >
                 <MoreOptionsCard>
+                  {note.reminderEnabled && !note.completed && <MoreOption onPress={() => { handleDone(note); setOpenMenuId(null); }}><MutedText>Mark as done</MutedText></MoreOption>}
                   <MoreOption
                     onPress={() => {
                       handleEdit(note);
@@ -438,46 +463,7 @@ const Diary = () => {
           })()}
       </View>
 
-      <MyModal
-        visible={action !== null}
-        onClose={() => setAction(null)}
-        placement="bottom"
-      >
-        <View style={{ gap: 16 }}>
-          {action === 'add' && (
-            <CustomCalendar
-              selectedDate={selectedDate ?? undefined}
-              onDayPress={d => setSelectedDate(d.dateString)}
-            />
-          )}
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between' }}
-          >
-            <H3>Quick Idea</H3>
-            <TouchableWithoutFeedback onPress={() => setAction(null)}>
-              <X size={16} color={Theme.colors.mutedForeground} />
-            </TouchableWithoutFeedback>
-          </View>
-          <Input
-            placeholder="Capture your thought..."
-            numberOfLines={3}
-            value={draft}
-            onChangeText={setDraft}
-          />
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between' }}
-          >
-            <MutedText>{draft.length}/200</MutedText>
-            <Button
-              variant="rounded"
-              onPress={handleSave}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </Button>
-          </View>
-        </View>
-      </MyModal>
+      {userId && selectedDate && <QuickIdeaEditor visible={action !== null} userId={userId} initialDate={selectedDate} note={action === 'edit' ? editingNote : null} onClose={() => { setAction(null); setEditingNote(null); }} onSaved={() => resetAndFetch()} />}
     </Screen>
   );
 };

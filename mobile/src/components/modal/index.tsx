@@ -1,10 +1,13 @@
-import React, { Fragment } from 'react';
+import React from 'react';
 import {
   Modal,
   View,
   TouchableWithoutFeedback,
   StyleSheet,
-  Text,
+  StyleProp,
+  ViewStyle,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {
   BottomPlacementStyles,
@@ -22,6 +25,8 @@ export interface MyModalProps {
   children?: React.ReactNode;
   placement?: 'top' | 'center' | 'bottom';
   modalHeader?: string;
+  contentStyle?: StyleProp<ViewStyle>;
+  keyboardAware?: boolean;
 }
 
 const MyModal = ({
@@ -30,6 +35,8 @@ const MyModal = ({
   children,
   placement = 'center',
   modalHeader,
+  contentStyle,
+  keyboardAware = false,
 }: MyModalProps) => {
   const renderHeader = () => {
     if (modalHeader) {
@@ -54,7 +61,13 @@ const MyModal = ({
 
   return (
     <View>
-      <Modal visible={visible} transparent animationType="fade">
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+        statusBarTranslucent
+      >
         <TouchableWithoutFeedback onPress={onClose}>
           <OverlayStyles>
             <BlurView
@@ -63,21 +76,32 @@ const MyModal = ({
               blurAmount={4}
               reducedTransparencyFallbackColor="white"
             />
-            <TouchableWithoutFeedback>
+            {keyboardAware ? <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              pointerEvents="box-none"
+              style={StyleSheet.absoluteFill}
+            >
+              <TouchableWithoutFeedback>
+                <BottomPlacementStyles style={contentStyle}>
+                  {modalHeader && renderHeader()}
+                  {children}
+                </BottomPlacementStyles>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView> : <TouchableWithoutFeedback>
               {placement === 'bottom' ? (
-                <BottomPlacementStyles>
+                <BottomPlacementStyles style={contentStyle}>
                   {modalHeader && renderHeader()}
                   {children}
                 </BottomPlacementStyles>
               ) : (
-                <ModalContent>
+                <ModalContent style={contentStyle}>
                   <View style={{ justifyContent: 'space-between' }}>
                     {modalHeader && renderHeader()}
                   </View>
                   {children}
                 </ModalContent>
               )}
-            </TouchableWithoutFeedback>
+            </TouchableWithoutFeedback>}
           </OverlayStyles>
         </TouchableWithoutFeedback>
       </Modal>

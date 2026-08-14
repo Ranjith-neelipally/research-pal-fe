@@ -99,7 +99,7 @@ const ProjectStructure: React.FC<YourComponentProps> = ({
         </View>
       </Card>
       <MutedText style={{ textAlign: 'center' }}>
-        Tap any plot to view or add notes
+        Tap any plot to view or add notes and images.
       </MutedText>
     </View>
   );

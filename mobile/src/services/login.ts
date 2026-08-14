@@ -1,6 +1,7 @@
-import api from './api';
+import api, { refreshAccessToken, SESSION_ID_KEY } from './api';
 import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { cancelAllIdeaReminders } from './ideaReminders';
 
 interface userinformation {
   firstName: string;
@@ -17,6 +18,8 @@ interface loginResponse {
     verified: boolean;
     projects: string[];
     email: string;
+    profession?: string;
+    createdAt?: string;
   };
   accessToken?: string;
   refreshToken: string;
@@ -24,7 +27,29 @@ interface loginResponse {
 }
 
 const REFRESH_TOKEN_KEY = 'refresh_token';
+const ACCESS_TOKEN_KEY = 'access_token';
 const VERIFICATION_TOKEN_KEY = 'verification_token';
+let sessionRefreshPromise: Promise<boolean> | null = null;
+
+const authDebug = (message: string, details?: Record<string, unknown>) => {
+  if (__DEV__) console.log(`[auth] ${message}`, details || '');
+};
+
+const clearStoredLogin = async () => {
+  await cancelAllIdeaReminders();
+  await AsyncStorage.multiRemove([
+    REFRESH_TOKEN_KEY,
+    ACCESS_TOKEN_KEY,
+    SESSION_ID_KEY,
+    '_id',
+    'username',
+    'verified',
+    'email',
+    'profession',
+    'created_at',
+  ]);
+  await useAuthStore.getState().clearUser();
+};
 
 export async function loginService(email: string, password: string) {
   const response = await api.post<loginResponse>('auth/login', {
@@ -33,14 +58,30 @@ export async function loginService(email: string, password: string) {
   });
   const responseData = (response.data as any).data || response.data;
   const accessToken = responseData.accessToken || responseData.token || '';
+  const sessionId = responseData.sessionId || '';
 
-  await AsyncStorage.multiSet([
+  if (!accessToken || !responseData.refreshToken) {
+    throw new Error('Login response did not include mobile credentials');
+  }
+
+  const credentials: [string, string][] = [
     [REFRESH_TOKEN_KEY, responseData.refreshToken],
+    [ACCESS_TOKEN_KEY, accessToken],
     ['_id', responseData.profile.id],
     ['username', responseData.profile.name],
     ['verified', String(responseData.profile.verified)],
     ['email', responseData.profile.email],
-  ]);
+    ['profession', responseData.profile.profession || ''],
+    ['created_at', responseData.profile.createdAt || ''],
+  ];
+  if (sessionId) credentials.push([SESSION_ID_KEY, sessionId]);
+  await AsyncStorage.multiSet(credentials);
+  authDebug('login credentials persisted', {
+    accessTokenReceived: true,
+    refreshTokenReceived: true,
+    refreshTokenPersisted: true,
+    sessionIdPersisted: Boolean(sessionId),
+  });
 
   await useAuthStore.getState().setUser({
     _id: responseData.profile.id,
@@ -48,62 +89,83 @@ export async function loginService(email: string, password: string) {
     email: responseData.profile.email,
     verified: responseData.profile.verified,
     token: accessToken,
+    profession: responseData.profile.profession || '',
+    createdAt: responseData.profile.createdAt,
   });
 
   return responseData.profile.id;
 }
 
-export async function refreshSession() {
-  const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) return false;
+const refreshStoredSession = async (): Promise<boolean> => {
+  const stored = await AsyncStorage.multiGet([
+    REFRESH_TOKEN_KEY,
+    ACCESS_TOKEN_KEY,
+    '_id',
+    'username',
+    'email',
+    'verified',
+    'profession',
+    'created_at',
+  ]);
+  const storedMap = stored.reduce((acc, [key, value]) => {
+    acc[key] = value;
+    return acc;
+  }, {} as Record<string, string | null>);
+  const refreshToken = storedMap[REFRESH_TOKEN_KEY];
+  authDebug('bootstrap storage loaded', {
+    refreshTokenFound: Boolean(refreshToken),
+    accessTokenFound: Boolean(storedMap[ACCESS_TOKEN_KEY]),
+  });
+  if (!refreshToken) {
+    // Also cleans alarms left by older app builds that logged out without
+    // cancelling device-local reminders.
+    await cancelAllIdeaReminders();
+    return false;
+  }
 
-  try {
-    const response = await api.post<loginResponse>('/auth/refresh', {
-      refreshToken,
-    });
-    const responseData = (response.data as any).data || response.data;
-    const accessToken = responseData.accessToken || responseData.token || '';
-    const nextRefreshToken = responseData.refreshToken;
-
-    if (!accessToken || !nextRefreshToken) return false;
-
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-
-    const stored = await AsyncStorage.multiGet([
-      '_id',
-      'username',
-      'email',
-      'verified',
-    ]);
-    const storedMap = stored.reduce((acc, [key, value]) => {
-      acc[key] = value;
-      return acc;
-    }, {} as Record<string, string | null>);
-
+  const cachedAccessToken = storedMap[ACCESS_TOKEN_KEY];
+  if (cachedAccessToken && storedMap._id) {
     await useAuthStore.getState().setUser({
-      _id: storedMap._id || '',
+      _id: storedMap._id,
       username: storedMap.username || '',
       email: storedMap.email || '',
       verified: storedMap.verified === 'true',
-      token: accessToken,
+      token: cachedAccessToken,
+      profession: storedMap.profession || '',
+      createdAt: storedMap.created_at || undefined,
     });
-
-    return true;
-  } catch (error) {
-    await AsyncStorage.multiRemove([
-      REFRESH_TOKEN_KEY,
-      '_id',
-      'username',
-      'verified',
-      'email',
-    ]);
-    await useAuthStore.getState().clearUser();
-    return false;
   }
+
+  const accessToken = await refreshAccessToken();
+  if (!accessToken) return Boolean(cachedAccessToken && storedMap._id);
+
+  await useAuthStore.getState().setUser({
+    _id: storedMap._id || '',
+    username: storedMap.username || '',
+    email: storedMap.email || '',
+    verified: storedMap.verified === 'true',
+    token: accessToken,
+    profession: storedMap.profession || '',
+    createdAt: storedMap.created_at || undefined,
+  });
+  authDebug('authenticated state restored');
+  return true;
+};
+
+export async function refreshSession() {
+  if (!sessionRefreshPromise) {
+    sessionRefreshPromise = refreshStoredSession().finally(() => {
+      sessionRefreshPromise = null;
+    });
+  }
+  return sessionRefreshPromise;
 }
 
 export async function logoutService(fromAll = false) {
   const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+
+  // Reminders are device-local and must not survive either logout path.
+  await cancelAllIdeaReminders();
 
   try {
     await api.post(
@@ -112,14 +174,7 @@ export async function logoutService(fromAll = false) {
       { params: fromAll ? { fromAll: 'yes' } : undefined },
     );
   } finally {
-    await AsyncStorage.multiRemove([
-      REFRESH_TOKEN_KEY,
-      '_id',
-      'username',
-      'verified',
-      'email',
-    ]);
-    await useAuthStore.getState().clearUser();
+    await clearStoredLogin();
   }
 }
 

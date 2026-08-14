@@ -2,10 +2,34 @@ import axios from 'axios';
 import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeApiError } from './apiError';
+import { Platform } from 'react-native';
+import { cancelAllIdeaReminders } from './ideaReminders';
 
-// const API_BASE_URL = 'http://10.252.212.6:1430/';
-const API_BASE_URL = 'https://api.research-pal.com/';
+export const API_BASE_URL = __DEV__
+  ? 'http://192.168.31.120:3000/'
+  : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
+const ACCESS_TOKEN_KEY = 'access_token';
+const DEVICE_ID_KEY = 'research_pal_device_id';
+export const SESSION_ID_KEY = 'session_id';
+
+const authDebug = (message: string, details?: Record<string, unknown>) => {
+  if (__DEV__) console.log(`[auth] ${message}`, details || '');
+};
+
+const getDeviceIdentity = async () => {
+  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  const constants = Platform.constants as Record<string, any>;
+  const model = Platform.OS === 'android'
+    ? constants.Model || constants.Brand || 'Android device'
+    : constants.interfaceIdiom === 'pad' ? 'iPad' : 'iPhone';
+  const osVersion = String(constants.Release || constants.osVersion || Platform.Version);
+  return { id, model, platform: Platform.OS, osVersion };
+};
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -27,6 +51,12 @@ api.interceptors.request.use(
     }
     const user = useAuthStore.getState().getUser();
     const tokenData = user?.token;
+    const device = await getDeviceIdentity();
+    config.headers['X-Device-Id'] = device.id;
+    config.headers['X-Device-Model'] = device.model;
+    config.headers['X-Device-Platform'] = device.platform;
+    config.headers['X-Device-Os-Version'] = device.osVersion;
+    config.headers['X-Client-Type'] = 'mobile';
 
     if (tokenData) {
       config.headers.Authorization = `Bearer ${tokenData}`;
@@ -40,8 +70,11 @@ api.interceptors.request.use(
 );
 
 const clearSession = async () => {
+  await cancelAllIdeaReminders();
   await AsyncStorage.multiRemove([
     REFRESH_TOKEN_KEY,
+    ACCESS_TOKEN_KEY,
+    SESSION_ID_KEY,
     '_id',
     'username',
     'verified',
@@ -50,34 +83,52 @@ const clearSession = async () => {
   await useAuthStore.getState().clearUser();
 };
 
-const refreshAccessToken = async () => {
+export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      authDebug('refresh token loaded', { found: Boolean(refreshToken) });
 
       if (!refreshToken) {
-        await clearSession();
         return null;
       }
 
       try {
+        authDebug('refresh attempt started');
         const response = await axios.post(`${API_BASE_URL}auth/refresh`, {
           refreshToken,
+        }, {
+          headers: { 'X-Client-Type': 'mobile' },
         });
         const responseData = response.data?.data || response.data;
         const nextAccessToken = responseData.accessToken || responseData.token;
         const nextRefreshToken = responseData.refreshToken;
+        const sessionId = responseData.sessionId;
 
         if (!nextAccessToken || !nextRefreshToken) {
-          await clearSession();
+          authDebug('refresh response missing credentials');
           return null;
         }
 
-        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+        const credentials: [string, string][] = [
+          [REFRESH_TOKEN_KEY, nextRefreshToken],
+          [ACCESS_TOKEN_KEY, nextAccessToken],
+        ];
+        if (sessionId) credentials.push([SESSION_ID_KEY, sessionId]);
+        await AsyncStorage.multiSet(credentials);
         useAuthStore.getState().setAccessToken(nextAccessToken);
+        authDebug('refresh completed', {
+          accessTokenReceived: true,
+          refreshTokenPersisted: true,
+          sessionIdPersisted: Boolean(sessionId),
+        });
         return nextAccessToken;
-      } catch (error) {
-        await clearSession();
+      } catch (error: any) {
+        const status = Number(error?.response?.status || error?.status || 0);
+        authDebug('refresh failed', { status: status || 'network' });
+        if (status === 401 || status === 403) {
+          await clearSession();
+        }
         return null;
       }
     })().finally(() => {
