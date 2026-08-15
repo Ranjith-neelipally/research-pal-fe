@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import { cancelAllIdeaReminders } from './ideaReminders';
 
 export const API_BASE_URL = __DEV__
-  ? 'http://192.168.31.120:3000/'
+  ? 'http://127.0.0.1:3000/'
   : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ACCESS_TOKEN_KEY = 'access_token';
