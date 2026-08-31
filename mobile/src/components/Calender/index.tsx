@@ -3,6 +3,7 @@ import React from 'react';
 import { Calendar, CalendarProps } from 'react-native-calendars';
 import { Theme } from '../theme';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { toLocalDateString } from '../../utils/common';
 
 interface CustomCalendarProps extends CalendarProps {
   selectedDate?: string;
@@ -14,7 +15,7 @@ const CustomCalendar = ({
   onSelectDate,
   ...props
 }: CustomCalendarProps) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateString(new Date());
 
   const renderArrow = (direction: 'left' | 'right') => (
     <View style={{ padding: 4 }}>

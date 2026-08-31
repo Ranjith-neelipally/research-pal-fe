@@ -9,7 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   NavigationProp,
   useFocusEffect,
@@ -56,7 +56,7 @@ const ProjectsData = () => {
   const updateProject = useProjectsStore(state => state.updateProject);
   const removeProject = useProjectsStore(state => state.removeProject);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const menuButtonRefs = useRef<Record<string, View | null>>({});
+  const menuButtonRefs = useRef<Record<string, React.ElementRef<typeof View> | null>>({});
   const setAddNewButtonVisible = useAddNewButtonActionsStore(
     state => state.setAddNewButtonActionsVisible,
   );
@@ -73,7 +73,7 @@ const ProjectsData = () => {
   const [projectName, setProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [inputError, setInputError] = useState('');
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ElementRef<typeof TextInput>>(null);
 
   const handleProjectsFetch = useCallback(async () => {
     if (!userId) {
@@ -82,13 +82,7 @@ const ProjectsData = () => {
     }
 
     setIsLoadingProjects(true);
-    console.log('Fetching all projects...');
-    const response = await getAllProjectsService(userId);
-    if (response) {
-      console.log('Projects fetched successfully:', response);
-    } else {
-      console.log('Failed to fetch projects.');
-    }
+    await getAllProjectsService(userId);
     setIsLoadingProjects(false);
   }, [userId]);
 
@@ -96,10 +90,6 @@ const ProjectsData = () => {
     navigation.navigate('ProjectCreation');
     setIsProjectAdding(true);
   }, [navigation, setIsProjectAdding]);
-
-  useEffect(() => {
-    handleProjectsFetch();
-  }, [handleProjectsFetch]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -126,7 +116,7 @@ const ProjectsData = () => {
   const openMenu = useCallback(
     (projectId: string) => {
       menuButtonRefs.current[projectId]?.measureInWindow(
-        (x, y, width, height) => {
+        (x: number, y: number, width: number, height: number) => {
           const left = Math.min(
             Math.max(SCREEN_MARGIN, x + width - MENU_WIDTH),
             screenWidth - MENU_WIDTH - SCREEN_MARGIN,

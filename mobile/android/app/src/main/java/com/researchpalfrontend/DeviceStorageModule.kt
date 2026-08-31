@@ -21,8 +21,9 @@ class DeviceStorageModule(
         try {
             val stat = StatFs(Environment.getDataDirectory().absolutePath)
             val result = com.facebook.react.bridge.Arguments.createMap().apply {
-                putDouble("totalSpace", stat.totalBytes.toDouble())
-                putDouble("freeSpace", stat.availableBytes.toDouble())
+                putDouble("totalBytes", stat.totalBytes.toDouble())
+                putDouble("freeBytes", stat.availableBytes.toDouble())
+                putDouble("usedBytes", (stat.totalBytes - stat.availableBytes).toDouble())
             }
             promise.resolve(result)
         } catch (error: Exception) {

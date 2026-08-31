@@ -3,7 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { getAllPhotoIds } from '../../../services/Photos';
 import { StoredPhoto, usePhotoStorage } from '../../../localStorage';
 import { useAuthStore } from '../../../store/auth.store';
-import { H1, MutedText, Screen } from '../../../components/commonStyles/styles';
+import { Screen } from '../../../components/commonStyles/styles';
 import PhotosModel from './PhotosModel';
 import { useFocusEffect } from '@react-navigation/native';
 import LoadingState from '../../../components/LoadingState';

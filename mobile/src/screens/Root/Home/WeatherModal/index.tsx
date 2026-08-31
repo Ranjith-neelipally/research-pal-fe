@@ -176,7 +176,6 @@ export default function WeatherModal() {
         };
         setLoc(picked);
 
-        // 2) Fetch current + daily (today/tomorrow) with LOCAL units
         const url =
           `https://api.open-meteo.com/v1/forecast?latitude=${picked.latitude}` +
           `&longitude=${picked.longitude}` +
@@ -218,33 +217,39 @@ export default function WeatherModal() {
 
   if (loading) {
     return (
-      <View>
+      <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-end' }}>
         <ActivityIndicator size="small" color="#B8E6B8" />
-        <Text>Loading weather…</Text>
+        <Text numberOfLines={1}>Loading weather…</Text>
       </View>
     );
   }
 
   if (!autoWeather) {
-    return <View><Text>Auto Weather off</Text></View>;
+    return (
+      <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-end' }}>
+        <Text numberOfLines={1}>Auto Weather off</Text>
+      </View>
+    );
   }
 
   if (!weather || !loc) {
     return (
-      <View>
-        <Text>Weather unavailable</Text>
+      <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-end' }}>
+        <Text numberOfLines={1}>Weather unavailable</Text>
       </View>
     );
   }
   const { icon, label } = iconAndLabelForCode(weather.code, weather.is_day);
 
   return (
-    <View style={{ alignItems: 'flex-end' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <View style={{ width: '100%', minWidth: 0, alignItems: 'flex-end' }}>
+      <View style={{ width: '100%', minWidth: 0, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
         {icon}
-        <H2>{weather.currentTemp} °</H2>
+        <H2 style={{ flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {weather.currentTemp} °
+        </H2>
       </View>
-      <Text>{label}</Text>
+      <Text numberOfLines={1}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         <Droplets color={Theme.colors.mutedForeground} size={12} />
 

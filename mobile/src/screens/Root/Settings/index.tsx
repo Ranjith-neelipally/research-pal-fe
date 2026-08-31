@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,8 @@ import {
   LogOut,
   MonitorSmartphone,
   Pencil,
+  Trash2,
+  ShieldCheck,
 } from 'lucide-react-native';
 import { Card } from '../../../components/Card/styles';
 import {
@@ -41,8 +44,9 @@ import {
 } from '../../../services/settings';
 import { getAllProjectsService } from '../../../services/Projects/Project';
 import { useProjectsStore } from '../../../store/Projects/Projects.store';
+import { clearUserLocalData, confirmAccountDeletion, requestAccountDeletion } from '../../../services/accountDeletion';
 
-type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | null;
+type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | null;
 type Session = {
   id: string;
   title: string;
@@ -60,6 +64,17 @@ const bytes = (value: number) => {
   return `${(value / Math.pow(1024, index)).toFixed(index > 2 ? 1 : 0)} ${
     units[index]
   }`;
+};
+
+const PRIVACY_URL = 'https://research-pal.com/privacy';
+const ACCOUNT_DELETION_URL = 'https://research-pal.com/account-deletion';
+
+const openPublicPage = async (url: string) => {
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert('Unable to open page', `Visit ${url} in your browser.`);
+  }
 };
 
 const SettingRow = ({ icon, title, detail, onPress, danger = false }: any) => (
@@ -98,6 +113,26 @@ export default function SettingsScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleteOtp, setDeleteOtp] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+
+  const sendDeleteCode = async () => {
+    setSaving(true); setDeleteError('');
+    try { await requestAccountDeletion(); setSheet('deleteOtp'); }
+    catch (error: any) { setDeleteError(error?.message || 'Unable to send a verification code.'); }
+    finally { setSaving(false); }
+  };
+
+  const deleteAccount = async () => {
+    if (!/^\d{6}$/.test(deleteOtp)) return setDeleteError('Enter the 6-digit code.');
+    setSaving(true); setDeleteError('');
+    try {
+      await confirmAccountDeletion(deleteOtp);
+      await clearUserLocalData();
+    } catch (error: any) {
+      setDeleteError(error?.message || "We couldn't delete your account. Please try again.");
+    } finally { setSaving(false); }
+  };
 
   const load = useCallback(async () => {
     const [, remoteProfile, weatherValue, photoStats] = await Promise.all([
@@ -318,6 +353,21 @@ export default function SettingsScreen() {
         </Card>
 
         <Card style={styles.card}>
+          <H3>Privacy</H3>
+          <SettingRow
+            icon={<ShieldCheck size={19} color={Theme.colors.mutedForeground} />}
+            title="Privacy Policy"
+            detail="How ResearchPal handles your data"
+            onPress={() => openPublicPage(PRIVACY_URL)}
+          />
+          <SettingRow
+            icon={<Trash2 size={19} color={Theme.colors.mutedForeground} />}
+            title="Account deletion information"
+            onPress={() => openPublicPage(ACCOUNT_DELETION_URL)}
+          />
+        </Card>
+
+        <Card style={styles.card}>
           <H3>Security</H3>
           <SettingRow
             icon={<KeyRound size={19} color={Theme.colors.mutedForeground} />}
@@ -339,6 +389,13 @@ export default function SettingsScreen() {
             title="Sign Out"
             danger
             onPress={() => setSheet('signout')}
+          />
+          <SettingRow
+            icon={<Trash2 size={19} color="#e46d6d" />}
+            title="Delete account"
+            detail="Permanently remove your profile and data"
+            danger
+            onPress={() => { setDeleteError(''); setSheet('deleteWarning'); }}
           />
         </Card>
       </ScrollView>
@@ -462,6 +519,28 @@ export default function SettingsScreen() {
               </Pressable>
             </>
           )}
+          {sheet === 'deleteWarning' && (
+            <>
+              <H3>Delete your account permanently?</H3>
+              <MutedText>Deleting your ResearchPal account permanently removes your profile and all data associated with your account. This includes projects, plots, observations, notes, ideas, photos, sessions, and other ResearchPal data owned by this account.</MutedText>
+              <TextSecondary style={styles.danger}>Once this is done, your ResearchPal profile and data cannot be recovered.</TextSecondary>
+              {deleteError ? <TextSecondary style={styles.danger}>{deleteError}</TextSecondary> : null}
+              <Pressable style={styles.dangerButton} disabled={saving} onPress={sendDeleteCode}><TextSecondary>{saving ? 'Sending…' : 'Continue'}</TextSecondary></Pressable>
+              <Pressable style={styles.sheetAction} disabled={saving} onPress={() => setSheet(null)}><MutedText>Cancel</MutedText></Pressable>
+            </>
+          )}
+          {sheet === 'deleteOtp' && (
+            <>
+              <H3>Verify account deletion</H3>
+              <MutedText>We sent a 6-digit verification code to your registered email address.</MutedText>
+              <TextInput style={styles.input} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} placeholder="6-digit code" placeholderTextColor={Theme.colors.mutedForeground} value={deleteOtp} onChangeText={value => setDeleteOtp(value.replace(/\D/g, '').slice(0, 6))} />
+              <TextSecondary style={styles.danger}>This action permanently deletes your account and cannot be undone.</TextSecondary>
+              {deleteError ? <TextSecondary style={styles.danger}>{deleteError}</TextSecondary> : null}
+              <Pressable style={styles.dangerButton} disabled={saving || deleteOtp.length !== 6} onPress={deleteAccount}><TextSecondary>{saving ? 'Deleting…' : 'Verify and delete'}</TextSecondary></Pressable>
+              <Pressable style={styles.sheetAction} disabled={saving} onPress={sendDeleteCode}><TextSecondary>Resend code</TextSecondary></Pressable>
+              <Pressable style={styles.sheetAction} disabled={saving} onPress={() => setSheet(null)}><MutedText>Cancel</MutedText></Pressable>
+            </>
+          )}
         </View>
       </Modal>
     </View>
@@ -560,4 +639,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#303744',
   },
+  dangerButton: { backgroundColor: '#a83232', borderRadius: 10, padding: 14, alignItems: 'center' },
 });

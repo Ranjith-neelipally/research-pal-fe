@@ -26,9 +26,9 @@ object IdeaReminderScheduler {
             }
             val pending = PendingIntent.getBroadcast(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (Build.VERSION.SDK_INT >= 31 && alarm.canScheduleExactAlarms())
-                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pending)
-            else alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pending)
+            // Ideas are convenience reminders, not alarm-clock events. Inexact alarms
+            // avoid restricted exact-alarm access while remaining battery friendly.
+            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pending)
             id
         }.toIntArray()
         val record = JSONObject().put("text", text).put("times", JSONArray(times)).put("ids", JSONArray(ids.toList()))

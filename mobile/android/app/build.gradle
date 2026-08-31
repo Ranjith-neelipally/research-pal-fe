@@ -19,7 +19,7 @@ react {
 
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
-    //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
+    //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
     // debuggableVariants = ["liteDebug", "prodDebug"]
 
@@ -57,7 +57,16 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
+def releaseStoreFile = project.findProperty("RESEARCHPAL_UPLOAD_STORE_FILE") ?: System.getenv("RESEARCHPAL_UPLOAD_STORE_FILE")
+def releaseStorePassword = project.findProperty("RESEARCHPAL_UPLOAD_STORE_PASSWORD") ?: System.getenv("RESEARCHPAL_UPLOAD_STORE_PASSWORD")
+def releaseKeyAlias = project.findProperty("RESEARCHPAL_UPLOAD_KEY_ALIAS") ?: System.getenv("RESEARCHPAL_UPLOAD_KEY_ALIAS")
+def releaseKeyPassword = project.findProperty("RESEARCHPAL_UPLOAD_KEY_PASSWORD") ?: System.getenv("RESEARCHPAL_UPLOAD_KEY_PASSWORD")
+def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
+
+if (releaseRequested && (!releaseStoreFile || !releaseStorePassword || !releaseKeyAlias || !releaseKeyPassword)) {
+    throw new GradleException("Release signing is not configured. Set RESEARCHPAL_UPLOAD_STORE_FILE, RESEARCHPAL_UPLOAD_STORE_PASSWORD, RESEARCHPAL_UPLOAD_KEY_ALIAS, and RESEARCHPAL_UPLOAD_KEY_PASSWORD in local Gradle properties or the environment.")
+}
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -83,7 +92,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
+        manifestPlaceholders = [usesCleartextTraffic: "false"]
     }
     signingConfigs {
         debug {
@@ -92,17 +102,28 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.findByName("release")
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            shrinkResources enableProguardInReleaseBuilds
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a"
+            }
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
     }
 }

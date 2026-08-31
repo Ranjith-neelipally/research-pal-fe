@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toLocalDateString } from '../utils/common';
 
 export interface QuickNote {
   _id: string;
@@ -33,7 +34,7 @@ export interface QuickNotesState {
 
 export const useQuickNotesStore = create<QuickNotesState>(set => ({
   quickNotes: [],
-  currentDate: new Date().toISOString().split('T')[0],
+  currentDate: toLocalDateString(new Date()),
   addQuickNote: note =>
     set(state => ({ quickNotes: [...state.quickNotes, note] })),
   setQuickNotes: notes => set({ quickNotes: notes }),

@@ -86,7 +86,7 @@ const ProjectLocation = () => {
       } else {
         setSearchResults([]);
       }
-    } catch (error) {
+    } catch {
       setSearchResults([]);
       const message = 'Unable to search location right now.';
       setLocationError(message);
@@ -109,13 +109,13 @@ const ProjectLocation = () => {
       return true;
     }
 
-    const finePermission = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
-    const hasFine = await PermissionsAndroid.check(finePermission);
-    if (hasFine) {
+    const coarsePermission = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+    const hasLocation = await PermissionsAndroid.check(coarsePermission);
+    if (hasLocation) {
       return true;
     }
 
-    const granted = await PermissionsAndroid.request(finePermission, {
+    const granted = await PermissionsAndroid.request(coarsePermission, {
       title: 'Location Permission',
       message:
         'ResearchPal needs access to your location to mark the project location.',
@@ -149,7 +149,7 @@ const ProjectLocation = () => {
   const fetchReliableCoordinates = async () => {
     try {
       return await getCurrentPosition({
-        enableHighAccuracy: true,
+        enableHighAccuracy: false,
         timeout: 25000,
         maximumAge: 0,
       });
@@ -250,7 +250,7 @@ const ProjectLocation = () => {
     <Screen>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'android' ? 'height' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'android' ? 180 : 0}
       >
         <View style={{ flex: 1, padding: 16 }}>

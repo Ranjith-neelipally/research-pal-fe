@@ -1,4 +1,4 @@
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules } from 'react-native';
 
 const native = NativeModules.IdeaReminder as {
   requestPermission(): Promise<boolean>;
@@ -19,7 +19,7 @@ export const reminderTimes = (date: string, customTime?: string | null) => {
 };
 
 export async function requestReminderPermission() {
-  return Platform.OS !== 'android' || !native ? false : native.requestPermission();
+  return native ? native.requestPermission() : false;
 }
 export async function pickIdeaReminderTime(initialTime?: string | null) {
   if (!native?.pickTime) return null;

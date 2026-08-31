@@ -6,7 +6,7 @@ export const cardGradientStart = { x: 0, y: 0 };
 export const cardGradientEnd = { x: 1, y: 1 };
 
 export const CardContainer = styled(LinearGradient)`
-  padding: 20px;
+
   border-radius: 12px;
 `;
 

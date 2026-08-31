@@ -10,7 +10,7 @@ export const updateProfile = async (name: string, profession: string) => {
   const profile = (await api.patch('/auth/profile', { name, profession })).data?.data?.profile;
   const current = useAuthStore.getState().user;
   if (current) await useAuthStore.getState().setUser({ ...current, username: profile.name, profession: profile.profession, createdAt: profile.createdAt });
-  await AsyncStorage.multiSet([['username', profile.name], ['profession', profile.profession || ''], ['created_at', profile.createdAt || '']]);
+  await AsyncStorage.setMany({ username: profile.name, profession: profile.profession || '', created_at: profile.createdAt || '' });
   return profile;
 };
 

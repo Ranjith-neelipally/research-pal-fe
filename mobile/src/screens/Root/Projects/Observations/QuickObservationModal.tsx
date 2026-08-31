@@ -60,7 +60,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const valueRef = useRef<TextInput>(null);
+  const valueRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const sortedPlots = useMemo(() => orderedPlots(plots).filter(plot => plot._id), [plots]);
   const captureGrid = useMemo(() => {
     const rows = Math.max(0, ...sortedPlots.map(plot => plot.plotIndex?.[0] || 0));
@@ -149,7 +149,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   const title = step === 'pick' ? 'What are you recording?' : step === 'new' ? 'New observation' : `${selected?.name}${selected?.unit ? ` · ${selected.unit}` : ''}`;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable onPress={close} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' }}>
         <Pressable onPress={event => event.stopPropagation()} style={{ height: '75%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.card, padding: 20 }}>
           {!(step === 'capture' && scope === 'all') && <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -183,7 +183,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
               <Pressable onPress={() => setStep('pick')} style={[secondaryButton, { flex: 0 }]}><ArrowLeft color={colors.text} /><Text style={secondaryText}>Back</Text></Pressable>
             </View>}
             {step === 'plot' && <View style={{ gap: 10 }}>
-              {sortedPlots.map(plot => <Pressable key={plot._id} onPress={() => { setSinglePlotId(plot._id); setStep('capture'); }} style={scopeCard}>
+              {sortedPlots.map(plot => <Pressable key={plot._id} onPress={() => { setSinglePlotId(plot._id || ''); setStep('capture'); }} style={scopeCard}>
                 <View style={{ flex: 1 }}><Text style={scopeTitle}>{getPlotDisplayName(plot)}</Text><Text style={scopeDescription}>Treatment T{plot.treatment} · Replication R{plot.replication}</Text></View><ArrowRight color={Theme.colors.primary} />
               </Pressable>)}
               <Pressable onPress={() => setStep('scope')} style={[secondaryButton, { flex: 0 }]}><ArrowLeft color={colors.text} /><Text style={secondaryText}>Back</Text></Pressable>

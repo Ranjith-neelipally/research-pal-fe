@@ -4,9 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeApiError } from './apiError';
 import { Platform } from 'react-native';
 import { cancelAllIdeaReminders } from './ideaReminders';
+import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
 export const API_BASE_URL = __DEV__
-  ? 'http://127.0.0.1:3000/'
+  ? 'http://10.11.109.235:3000/'
   : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -71,7 +72,8 @@ api.interceptors.request.use(
 
 const clearSession = async () => {
   await cancelAllIdeaReminders();
-  await AsyncStorage.multiRemove([
+  await clearSecureCredentials();
+  await AsyncStorage.removeMany([
     REFRESH_TOKEN_KEY,
     ACCESS_TOKEN_KEY,
     SESSION_ID_KEY,
@@ -86,7 +88,8 @@ const clearSession = async () => {
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = (async () => {
-      const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      const storedCredentials = await getSecureCredentials();
+      const refreshToken = storedCredentials?.refreshToken;
       authDebug('refresh token loaded', { found: Boolean(refreshToken) });
 
       if (!refreshToken) {
@@ -110,12 +113,12 @@ export const refreshAccessToken = async () => {
           return null;
         }
 
-        const credentials: [string, string][] = [
-          [REFRESH_TOKEN_KEY, nextRefreshToken],
-          [ACCESS_TOKEN_KEY, nextAccessToken],
-        ];
-        if (sessionId) credentials.push([SESSION_ID_KEY, sessionId]);
-        await AsyncStorage.multiSet(credentials);
+        await setSecureCredentials({
+          accessToken: nextAccessToken,
+          refreshToken: nextRefreshToken,
+          sessionId: sessionId || storedCredentials?.sessionId,
+        });
+        await AsyncStorage.removeMany([REFRESH_TOKEN_KEY, ACCESS_TOKEN_KEY, SESSION_ID_KEY]);
         useAuthStore.getState().setAccessToken(nextAccessToken);
         authDebug('refresh completed', {
           accessTokenReceived: true,

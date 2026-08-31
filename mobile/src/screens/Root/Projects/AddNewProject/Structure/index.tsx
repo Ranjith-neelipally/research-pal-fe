@@ -234,8 +234,8 @@ const ProjectStructure = () => {
     <Screen>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'android' ? 'height' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}

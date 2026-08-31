@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
-import RNFS from 'react-native-fs';
+import { Alert, Linking } from 'react-native';
+import * as RNFS from '@dr.pogodin/react-native-fs';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { executeSyncSql } from '../sync/sqlite/database';
 import { getDeviceStorageInfo } from '../services/deviceStorage';
@@ -30,7 +30,7 @@ export const getAttachedPhotoStorageStats = async () => {
     const { totalBytes } = await getDeviceStorageInfo();
     allowanceBytes = totalBytes * 0.2;
   } catch (error) {
-    if (__DEV__) console.error('Unable to read Android device storage', error);
+    if (__DEV__) console.error('Unable to read device storage', error);
   }
   return { photoCount: storedFiles.length, usedBytes, allowanceBytes };
 };
@@ -104,6 +104,10 @@ export const cleanupProjectLocalData = async (
       "DELETE FROM outbox_ops WHERE entity_type = 'note' AND entity_id = ?",
       [row.id],
     );
+    await executeSyncSql(
+      "DELETE FROM sync_conflicts WHERE entity_type = 'note' AND entity_id = ?",
+      [row.id],
+    );
   }
 
   const plots = await executeSyncSql(
@@ -116,6 +120,10 @@ export const cleanupProjectLocalData = async (
       "DELETE FROM outbox_ops WHERE entity_type = 'plot' AND entity_id = ?",
       [row.id],
     );
+    await executeSyncSql(
+      "DELETE FROM sync_conflicts WHERE entity_type = 'plot' AND entity_id = ?",
+      [row.id],
+    );
   }
 
   await executeSyncSql('DELETE FROM notes WHERE project_id = ?', [projectId]);
@@ -123,6 +131,10 @@ export const cleanupProjectLocalData = async (
   await executeSyncSql('DELETE FROM projects WHERE id = ?', [projectId]);
   await executeSyncSql(
     "DELETE FROM outbox_ops WHERE entity_type = 'project' AND entity_id = ?",
+    [projectId],
+  );
+  await executeSyncSql(
+    "DELETE FROM sync_conflicts WHERE entity_type = 'project' AND entity_id = ?",
     [projectId],
   );
 
@@ -137,10 +149,23 @@ export const cleanupProjectLocalData = async (
 };
 
 export const usePhotoStorage = () => {
+  const showPickerError = useCallback((error: unknown, capability: 'camera' | 'photos') => {
+    const code = typeof error === 'object' && error && 'code' in error ? String((error as any).code) : '';
+    const denied = code.includes('permission') || code.includes('denied');
+    Alert.alert(
+      denied ? `${capability === 'camera' ? 'Camera' : 'Photo'} access is disabled` : `Unable to open ${capability}`,
+      denied ? `You can allow ResearchPal access in system settings. Your existing ideas and photos are unaffected.` : 'Please try again.',
+      denied ? [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => void Linking.openSettings() }] : [{ text: 'OK' }],
+    );
+  }, []);
   const pickFromCamera = useCallback(async (): Promise<
     StoredPhoto[] | null
   > => {
-    const res = await launchCamera({ mediaType: 'photo' });
+    let res;
+    try { res = await launchCamera({ mediaType: 'photo' }); }
+    catch (error) { showPickerError(error, 'camera'); return null; }
+
+    if (res.errorCode) { showPickerError(res, 'camera'); return null; }
 
     if (!res.assets?.length) return null;
 
@@ -153,15 +178,16 @@ export const usePhotoStorage = () => {
     }
 
     return photos;
-  }, []);
+  }, [showPickerError]);
 
   const pickFromGallery = useCallback(async (): Promise<
     StoredPhoto[] | null
   > => {
-    const res = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 0,
-    });
+    let res;
+    try { res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 0 }); }
+    catch (error) { showPickerError(error, 'photos'); return null; }
+
+    if (res.errorCode) { showPickerError(res, 'photos'); return null; }
 
     if (!res.assets?.length) return null;
 
@@ -174,7 +200,7 @@ export const usePhotoStorage = () => {
     }
 
     return photos;
-  }, []);
+  }, [showPickerError]);
 
   const openPhotoPicker = useCallback(
     (onComplete?: (photos: StoredPhoto[]) => void) => {

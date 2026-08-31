@@ -28,6 +28,10 @@ export const MoreOptionsCard = styled.View`
   padding: 8px;
   z-index: 1;
   elevation: 10;
+  shadow-color: #000;
+  shadow-opacity: 0.3;
+  shadow-radius: 8px;
+  shadow-offset: 0px 4px;
   width: 85px;
   border-radius: 8px;
   border: 2px solid ${Theme.colors.backgroundSecondary};

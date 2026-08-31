@@ -28,9 +28,19 @@ function MainNavigator() {
 
   useEffect(() => {
     const bootstrapAuth = async () => {
+      let hydrationTimeout: ReturnType<typeof setTimeout> | undefined;
+
       try {
-        await refreshSession();
+        await Promise.race([
+          refreshSession(),
+          new Promise<void>(resolve => {
+            hydrationTimeout = setTimeout(resolve, 3000);
+          }),
+        ]);
+      } catch (error) {
+        if (__DEV__) console.warn('[auth] hydration failed', error);
       } finally {
+        if (hydrationTimeout) clearTimeout(hydrationTimeout);
         if (__DEV__) console.log('[auth] hydration completed');
         setHydrated(true);
       }

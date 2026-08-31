@@ -29,4 +29,7 @@ export const StyledAddNewButton = styled.TouchableOpacity<{
         `}
   elevation: 10;
   shadow-color: ${Theme.colors.primary};
+  shadow-opacity: 0.35;
+  shadow-radius: 8px;
+  shadow-offset: 0px 4px;
 `;

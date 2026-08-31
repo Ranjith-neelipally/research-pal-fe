@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useAuthStore } from '../auth.store';
 
 interface AddNewProjectState {
   title: string;

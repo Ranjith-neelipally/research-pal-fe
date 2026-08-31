@@ -10,7 +10,7 @@ interface InputProps extends React.ComponentProps<typeof TextInput> {
   IconRight?: React.ReactNode;
 }
 
-const Input = forwardRef<TextInput, InputProps>((props, ref) => {
+const Input = forwardRef<React.ElementRef<typeof TextInput>, InputProps>((props, ref) => {
   const [active, setActive] = useState(false);
 
   return (

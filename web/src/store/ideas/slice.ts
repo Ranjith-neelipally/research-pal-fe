@@ -13,7 +13,7 @@ const initialState: IdeasState = {
 const ideasSlice = createSlice({
   name: "ideas",
   initialState,
-  reducers: {},
+  reducers: { clearIdeas: () => initialState },
   extraReducers: (builder) => {
     builder
       .addCase(fetchIdeas.pending, (state) => {
@@ -47,5 +47,7 @@ const ideasSlice = createSlice({
       });
   },
 });
+
+export const { clearIdeas } = ideasSlice.actions;
 
 export default ideasSlice.reducer;

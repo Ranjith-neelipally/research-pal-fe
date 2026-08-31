@@ -1,22 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { ArrowLeft, ChevronDown, Download, Pencil, Plus, Trash2, X } from 'lucide-react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ArrowLeft, ChevronDown, Download, Pencil, Trash2, X } from 'lucide-react-native';
 import Input from '../../../../components/Input';
 import LoadingState from '../../../../components/LoadingState';
 import { Theme } from '../../../../components/theme';
 import {
   deleteObservationRecord,
   exportObservations,
-  exportSelectedCharts,
   getObservationGraphs,
   compareObservation,
   getObservationSummary,
   listObservationRecords,
   updateObservationRecord,
-  type ExportChart,
 } from '../../../../services/Observations';
 import type { ComparisonResult, ObservationGraphs, ObservationMeasurement, ObservationSummary, ObservationType } from '../../../../types/observation';
-import ObservationChart, { chartSvg, type ChartDatum, type ChartStyle } from './ObservationChart';
+import ObservationChart, { type ChartDatum, type ChartStyle } from './ObservationChart';
 
 type Tab = 'Data' | 'Graphs' | 'Summary';
 type GraphMode = 'Straight' | 'Comparison';
@@ -28,7 +26,7 @@ export default function ObservationDetails({ route, navigation }: any) {
   const [tab, setTab] = useState<Tab>('Data'); const [mode, setMode] = useState<GraphMode>('Straight'); const [style, setStyle] = useState<ChartStyle>('bar');
   const [records, setRecords] = useState<ObservationMeasurement[]>([]); const [graphs, setGraphs] = useState<ObservationGraphs>(); const [summary, setSummary] = useState<ObservationSummary>();
   const [loading, setLoading] = useState(true); const [selectedSession, setSelectedSession] = useState(''); const [selectedTreatment, setSelectedTreatment] = useState(''); const [allSessions, setAllSessions] = useState(false); const [comparisonSessions, setComparisonSessions] = useState<string[]>([]); const [comparison, setComparison] = useState<ComparisonResult>();
-  const [editing, setEditing] = useState<ObservationMeasurement>(); const [editValue, setEditValue] = useState(''); const [editNote, setEditNote] = useState(''); const [exportOpen, setExportOpen] = useState(false); const [charts, setCharts] = useState<ExportChart[]>([]);
+  const [editing, setEditing] = useState<ObservationMeasurement>(); const [editValue, setEditValue] = useState(''); const [editNote, setEditNote] = useState(''); const [exportOpen, setExportOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,7 +42,31 @@ export default function ObservationDetails({ route, navigation }: any) {
   useEffect(() => { void load(); }, [load]);
 
   const session = graphs?.sessions.find(item => item.id === selectedSession) || graphs?.sessions.at(-1);
-  const straightData = useMemo<ChartDatum[]>(() => { if (!graphs) return []; const source = selectedTreatment ? graphs.timeSeries.filter(item => item.treatmentId === selectedTreatment) : graphs.treatmentSeries; if (allSessions) return graphs.sessions.flatMap(current => source.flatMap(item => { const point = item.values.find(value => value.sessionId === current.id); if (point?.value == null) return []; const name = 'treatment' in item ? item.treatment : item.replication; return [{ key: `${current.id}-${'treatmentId' in item ? item.treatmentId : item.plotId}`, label: current.label, value: point.value, series: name, detail: 'treatment' in item ? `${item.treatment} · Mean · N ${point.count}` : `Treatment T${item.treatmentId} · ${item.replication} · ${item.plot}` }]; })); if (!session) return []; if (selectedTreatment) return session.comparePlots.filter(item => item.treatmentId === selectedTreatment).sort((a, b) => Number(a.replicationId) - Number(b.replicationId)).map(item => ({ key: item.plotId, label: item.plot, value: item.value, detail: `Treatment T${item.treatmentId} · Replication R${item.replicationId} · ${session.label}` })); return session.compareTreatments.map(item => ({ key: item.treatmentId, label: item.treatment, value: item.average, detail: `Mean · N ${item.count} · ${session.label}` })); }, [allSessions, graphs, selectedTreatment, session]);
+  const straightData = useMemo<ChartDatum[]>(() => {
+    if (!graphs) return [];
+    if (allSessions) {
+      const source = selectedTreatment
+        ? graphs.timeSeries.filter(item => item.treatmentId === selectedTreatment)
+        : graphs.treatmentSeries;
+      return graphs.sessions.flatMap(current => source.flatMap(item => {
+        const point = item.values.find(value => value.sessionId === current.id);
+        if (point?.value == null) return [];
+        if ('plotId' in item) {
+          return [{ key: `${current.id}-${item.plotId}`, label: current.label, value: point.value, series: item.replication, detail: `Treatment T${item.treatmentId} · ${item.replication} · ${item.plot}` }];
+        }
+        const count = 'count' in point ? point.count : 1;
+        return [{ key: `${current.id}-${item.treatmentId}`, label: current.label, value: point.value, series: item.treatment, detail: `${item.treatment} · Mean · N ${count}` }];
+      }));
+    }
+    if (!session) return [];
+    if (selectedTreatment) {
+      return session.comparePlots
+        .filter(item => item.treatmentId === selectedTreatment)
+        .sort((a, b) => Number(a.replicationId) - Number(b.replicationId))
+        .map(item => ({ key: item.plotId, label: item.plot, value: item.value, detail: `Treatment T${item.treatmentId} · Replication R${item.replicationId} · ${session.label}` }));
+    }
+    return session.compareTreatments.map(item => ({ key: item.treatmentId, label: item.treatment, value: item.average, detail: `Mean · N ${item.count} · ${session.label}` }));
+  }, [allSessions, graphs, selectedTreatment, session]);
   const comparisonData = useMemo<ChartDatum[]>(() => comparison?.points.flatMap((point, pointIndex) => comparison.series.flatMap(series => { const value = point.values[series.key]; return value == null ? [] : [{ key: `${pointIndex}-${series.key}`, label: point.category, value, series: series.label, detail: `${series.label} · ${comparison.title}` }]; })) || [], [comparison]);
   const displayedData = mode === 'Straight' ? straightData : comparisonData;
 
@@ -64,8 +86,6 @@ export default function ObservationDetails({ route, navigation }: any) {
   };
   const remove = (record: ObservationMeasurement) => Alert.alert('Delete observation?', 'This removes this plot value from its measurement session.', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await deleteObservationRecord(projectId, record.id); await load(); } catch (error: any) { Alert.alert('Could not delete', error.message); } } }]);
   const exportFile = async (format: 'csv' | 'xlsx' | 'pdf') => { try { const saved = await exportObservations(projectId, format, observationType.id); Alert.alert('Export saved', `${saved.fileName}\n${saved.uri}`); } catch (error: any) { if (__DEV__) console.error('Observation export failed', error); Alert.alert('Export failed', error.message || String(error)); } };
-  const addChart = () => { if (!displayedData.length) return Alert.alert('No chart data', 'Choose filters with data before adding this chart.'); const columns = ['Label', 'Series', 'Value']; const item: ExportChart = { title: observationType.name, subtitle: `${mode} · ${allSessions && mode === 'Straight' ? 'All sessions' : session?.label || comparison?.title || ''} · ${style}`, svg: chartSvg(displayedData, observationType.name, observationType.unit, style), columns, rows: displayedData.map(row => [row.label, row.series || '', row.value]) }; setCharts(items => [...items, item]); };
-  const exportCharts = async (format: 'png' | 'pdf' | 'xlsx') => { if (!charts.length) return; try { const path = await exportSelectedCharts(projectId, format, format === 'png' ? [charts[0]] : charts); Alert.alert('Charts saved', path); } catch (error: any) { Alert.alert('Chart export failed', error.message || String(error)); } };
 
   if (loading) return <View style={{ flex: 1, backgroundColor: colors.bg }}><LoadingState label="Loading structured data…" fullScreen /></View>;
   return <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -102,8 +122,6 @@ function FilterRow({ label, value, onPress }: { label: string; value: string; on
 function Stat({ label, value, unit }: { label: string; value: number | null; unit?: string | null }) { return <View style={[card, { flex: 1, alignItems: 'center' }]}><Text style={muted}>{label}</Text><Text style={{ color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 5 }}>{value == null ? '—' : value.toFixed(2)}{unit ? ` ${unit}` : ''}</Text></View>; }
 function Empty({ text }: { text: string }) { return <View style={card}><Text style={{ color: colors.muted, textAlign: 'center' }}>{text}</Text></View>; }
 function EditModal({ visible, type, value, note, setValue, setNote, close, save }: any) { return <Modal visible={visible} transparent animationType="fade"><View style={modalBackdrop}><View style={modalCard}><View style={modalHeader}><Text style={modalTitle}>Edit value</Text><Pressable onPress={close}><X color={colors.muted} /></Pressable></View>{type.dataType === 'boolean' ? <Segment values={['true', 'false']} value={value} onChange={setValue} /> : <Input label="Value" value={value} onChangeText={setValue} keyboardType={type.dataType === 'number' ? 'decimal-pad' : 'default'} />}<Input label="Note" value={note} onChangeText={setNote} /><Pressable onPress={save} style={primaryAction}><Text style={primaryActionText}>Save changes</Text></Pressable></View></View></Modal>; }
-function ExportModal({ visible, close, normal, addChart, charts, setCharts, exportCharts, preview }: any) { return <Modal visible={visible} transparent animationType="slide"><View style={modalBackdrop}><ScrollView style={modalCard} contentContainerStyle={{ gap: 14 }}><View style={modalHeader}><Text style={modalTitle}>Export</Text><Pressable onPress={close}><X color={colors.muted} /></Pressable></View><Text style={{ color: colors.text, fontWeight: '800' }}>Data and report</Text><View style={{ flexDirection: 'row', gap: 8 }}>{(['csv', 'xlsx', 'pdf'] as const).map(format => <Pressable key={format} onPress={() => void normal(format)} style={smallExport}><Text style={secondaryActionText}>{format === 'xlsx' ? 'Excel' : format.toUpperCase()}</Text></Pressable>)}</View><Text style={{ color: colors.text, fontWeight: '800', marginTop: 6 }}>Chart builder preview</Text>{preview}<Pressable onPress={addChart} style={primaryAction}><Plus size={18} color="#101318" /><Text style={primaryActionText}>Add this chart</Text></Pressable>{charts.map((chart: ExportChart, index: number) => <View key={`${chart.subtitle}-${index}`} style={card}><Text style={{ color: colors.text, fontWeight: '800' }}>{index + 1}. {chart.title}</Text><Text style={muted}>{chart.subtitle}</Text><Pressable onPress={() => setCharts((items: ExportChart[]) => items.filter((_, itemIndex) => itemIndex !== index))}><Text style={{ color: '#e36b73', marginTop: 8 }}>Remove</Text></Pressable></View>)}{!!charts.length && <><Pressable onPress={addChart} style={secondaryAction}><Text style={secondaryActionText}>+ Add another chart</Text></Pressable><View style={{ flexDirection: 'row', gap: 8 }}>{(['png', 'pdf', 'xlsx'] as const).map(format => <Pressable key={format} onPress={() => void exportCharts(format)} style={smallExport}><Text style={secondaryActionText}>{format === 'xlsx' ? 'Excel' : format.toUpperCase()}</Text></Pressable>)}</View></>}</ScrollView></View></Modal>; }
-
 const card = { borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 14, backgroundColor: colors.card };
 const muted = { color: colors.muted, marginTop: 4 };
 const iconButton = { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.border, alignItems: 'center' as const, justifyContent: 'center' as const };
@@ -131,4 +149,4 @@ const selectText = { flexShrink: 1, color: colors.text, fontSize: 12 };
 const chartCard = { borderWidth: 1, borderColor: colors.border, borderRadius: 17, padding: 14, backgroundColor: '#12181b' };
 const chartTitle = { color: colors.text, fontWeight: '800' as const, fontSize: 14 };
 const chartSubtitle = { color: colors.muted, fontSize: 11, marginTop: 2, marginBottom: 8 };
-function DataExportModal({ visible, close, normal }: any) { return <Modal visible={visible} transparent animationType="slide"><View style={modalBackdrop}><View style={modalCard}><View style={modalHeader}><Text style={modalTitle}>Export observation data</Text><Pressable onPress={close}><X color={colors.muted} /></Pressable></View><Text style={{ color: colors.muted, marginBottom: 12 }}>Files are saved to the public Downloads folder.</Text><View style={{ flexDirection: 'row', gap: 8 }}>{(['csv', 'xlsx', 'pdf'] as const).map(format => <Pressable key={format} onPress={() => void normal(format)} style={smallExport}><Text style={secondaryActionText}>{format === 'xlsx' ? 'Excel' : format.toUpperCase()}</Text></Pressable>)}</View></View></View></Modal>; }
+function DataExportModal({ visible, close, normal }: any) { return <Modal visible={visible} transparent animationType="slide"><View style={modalBackdrop}><View style={modalCard}><View style={modalHeader}><Text style={modalTitle}>Export observation data</Text><Pressable onPress={close}><X color={colors.muted} /></Pressable></View><Text style={{ color: colors.muted, marginBottom: 12 }}>{Platform.OS === 'ios' ? 'Choose where to share or save the generated file.' : 'Files are saved to the public Downloads folder.'}</Text><View style={{ flexDirection: 'row', gap: 8 }}>{(['csv', 'xlsx', 'pdf'] as const).map(format => <Pressable key={format} onPress={() => void normal(format)} style={smallExport}><Text style={secondaryActionText}>{format === 'xlsx' ? 'Excel' : format.toUpperCase()}</Text></Pressable>)}</View></View></View></Modal>; }

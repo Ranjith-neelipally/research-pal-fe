@@ -12,7 +12,7 @@ export default function ProjectsNavigator() {
       initialRouteName="ProjectTitle"
       screenOptions={{ header: () => <ProjectsHeader /> }}
     >
-      {Object.values(Screens).map((screen, index) => (
+      {Object.values(Screens).map(screen => (
         <Stack.Screen
           key={screen.name}
           name={screen.name}

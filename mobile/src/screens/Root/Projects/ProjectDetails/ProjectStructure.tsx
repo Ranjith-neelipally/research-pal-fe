@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '../../../../components/Card/styles';
 import { MutedText } from '../../../../components/commonStyles/styles';
 import { Project } from '../../../../store/Projects/Projects.store';
@@ -14,63 +14,104 @@ interface YourComponentProps {
   handlePlotPress: (plot: Plot | null) => () => void;
 }
 
+const lol = () => {};
+
 const ProjectStructure: React.FC<YourComponentProps> = ({
   project,
   grid,
   handlePlotPress,
 }) => {
+  const MIN_CELL_WIDTH = 60;
+  const GAP = 8;
+
+  const [gridWidth, setGridWidth] = useState(0);
+
+  const columnCount = Math.max(...grid.map(row => row.length));
+
+  const cellWidth =
+    gridWidth > 0
+      ? Math.max(
+          MIN_CELL_WIDTH,
+          (gridWidth - GAP * (columnCount - 1)) / columnCount,
+        )
+      : MIN_CELL_WIDTH;
   return (
     <View style={{ maxHeight: '72%', flex: 1, gap: 12 }}>
       <Card style={{ flex: 1, gap: 12 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1, borderRadius: 4 }}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flex: 1 }}>
-              {grid.map((row, rowIndex) => (
-                <View
-                  key={rowIndex}
-                  style={{
-                    flexDirection: 'row',
-                    marginBottom: 8,
-                  }}
-                >
-                  {row.map((cell, colIndex) => (
-                    <TouchableOpacity
-                      key={cell?.id ?? `empty-${rowIndex + 1}-${colIndex + 1}`}
-                      style={{
-                        minWidth: 60,
-                        minHeight: 60,
-                        height: '100%',
-                        width: '100%',
-                        flex: 1,
-                        marginRight: 8,
-                        backgroundColor: cell
-                          ? `${getTreatmentColor(cell.treatment)}50`
-                          : '#2b303b',
-                        borderWidth: 2,
-                        borderColor: cell
-                          ? getTreatmentColor(cell.treatment)
-                          : 'transparent',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: 6,
-                      }}
-                      onPress={handlePlotPress(cell)}
-                    >
-                      {cell && (
-                        <Text style={{ color: '#fff', fontSize: 12 }}>
-                          {getPlotDisplayName(cell)}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </ScrollView>
+        <View
+  style={{ flex: 1 }}
+  onLayout={e => {
+    setGridWidth(e.nativeEvent.layout.width);
+  }}
+>
+  <ScrollView
+    showsVerticalScrollIndicator={false}
+    style={{ flex: 1, borderRadius: 4 }}
+  >
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+    >
+      <View>
+        {grid.map((row, rowIndex) => (
+          <View
+            key={rowIndex}
+            style={{
+              flexDirection: 'row',
+              marginBottom: 8,
+            }}
+          >
+            {row.map((cell, colIndex) => (
+              <TouchableOpacity
+                key={
+                  cell?.id ??
+                  `empty-${rowIndex + 1}-${colIndex + 1}`
+                }
+                style={{
+                  width: cellWidth,
+                  height: cellWidth,
+
+                  marginRight:
+                    colIndex === row.length - 1 ? 0 : GAP,
+
+                  backgroundColor: cell
+                    ? `${getTreatmentColor(cell.treatment)}50`
+                    : '#2b303b',
+
+                  borderWidth: 2,
+                  borderColor: cell
+                    ? getTreatmentColor(cell.treatment)
+                    : 'transparent',
+
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                }}
+                onPress={handlePlotPress(cell)}
+              >
+                {cell && (
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{
+                      color: '#fff',
+                      fontSize: 12,
+                      textAlign: 'center',
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    {getPlotDisplayName(cell)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  </ScrollView>
+</View>
         <View
           style={{
             flexDirection: 'row',

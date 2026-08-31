@@ -1,17 +1,18 @@
 import React from 'react';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import styled from 'styled-components/native';
 import { Screens } from '../helpers';
 import { Tab, Bar, TabText } from './styles';
 import { useAddNewButtonActionsStore } from '../../../store/addNew.store';
 import AddNew from '../../../components/AddNew';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FloatingTabs(props: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
   const isAddNewButtonActionsVisible = useAddNewButtonActionsStore(
     state => state.isAddNewButtonActionsVisible,
   );
   return (
-    <Bar>
+    <Bar style={{ bottom: Math.max(16, insets.bottom) }}>
       {props.state.routes.map((route, idx) => {
         const focused = props.state.index === idx;
         const screen = Screens[route.name];

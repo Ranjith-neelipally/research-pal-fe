@@ -1,7 +1,5 @@
-import { View, Text } from 'react-native';
 import React from 'react';
 import { ButtonText, StyledButton } from './styles';
-import { MutedText } from '../commonStyles/styles';
 
 export interface ButtonProps extends React.ComponentProps<typeof StyledButton> {
   Icon?: React.ReactNode;

@@ -2,6 +2,7 @@ import api, { refreshAccessToken, SESSION_ID_KEY } from './api';
 import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cancelAllIdeaReminders } from './ideaReminders';
+import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
 interface userinformation {
   firstName: string;
@@ -37,7 +38,8 @@ const authDebug = (message: string, details?: Record<string, unknown>) => {
 
 const clearStoredLogin = async () => {
   await cancelAllIdeaReminders();
-  await AsyncStorage.multiRemove([
+  await clearSecureCredentials();
+  await AsyncStorage.removeMany([
     REFRESH_TOKEN_KEY,
     ACCESS_TOKEN_KEY,
     SESSION_ID_KEY,
@@ -64,9 +66,8 @@ export async function loginService(email: string, password: string) {
     throw new Error('Login response did not include mobile credentials');
   }
 
+  await setSecureCredentials({ accessToken, refreshToken: responseData.refreshToken, sessionId });
   const credentials: [string, string][] = [
-    [REFRESH_TOKEN_KEY, responseData.refreshToken],
-    [ACCESS_TOKEN_KEY, accessToken],
     ['_id', responseData.profile.id],
     ['username', responseData.profile.name],
     ['verified', String(responseData.profile.verified)],
@@ -74,8 +75,8 @@ export async function loginService(email: string, password: string) {
     ['profession', responseData.profile.profession || ''],
     ['created_at', responseData.profile.createdAt || ''],
   ];
-  if (sessionId) credentials.push([SESSION_ID_KEY, sessionId]);
-  await AsyncStorage.multiSet(credentials);
+  await AsyncStorage.setMany(Object.fromEntries(credentials));
+  await AsyncStorage.removeMany([REFRESH_TOKEN_KEY, ACCESS_TOKEN_KEY, SESSION_ID_KEY]);
   authDebug('login credentials persisted', {
     accessTokenReceived: true,
     refreshTokenReceived: true,
@@ -97,24 +98,18 @@ export async function loginService(email: string, password: string) {
 }
 
 const refreshStoredSession = async (): Promise<boolean> => {
-  const stored = await AsyncStorage.multiGet([
-    REFRESH_TOKEN_KEY,
-    ACCESS_TOKEN_KEY,
+  const [storedMap, secure] = await Promise.all([AsyncStorage.getMany([
     '_id',
     'username',
     'email',
     'verified',
     'profession',
     'created_at',
-  ]);
-  const storedMap = stored.reduce((acc, [key, value]) => {
-    acc[key] = value;
-    return acc;
-  }, {} as Record<string, string | null>);
-  const refreshToken = storedMap[REFRESH_TOKEN_KEY];
+  ]), getSecureCredentials()]);
+  const refreshToken = secure?.refreshToken;
   authDebug('bootstrap storage loaded', {
     refreshTokenFound: Boolean(refreshToken),
-    accessTokenFound: Boolean(storedMap[ACCESS_TOKEN_KEY]),
+    accessTokenFound: Boolean(secure?.accessToken),
   });
   if (!refreshToken) {
     // Also cleans alarms left by older app builds that logged out without
@@ -123,7 +118,7 @@ const refreshStoredSession = async (): Promise<boolean> => {
     return false;
   }
 
-  const cachedAccessToken = storedMap[ACCESS_TOKEN_KEY];
+  const cachedAccessToken = secure?.accessToken;
   if (cachedAccessToken && storedMap._id) {
     await useAuthStore.getState().setUser({
       _id: storedMap._id,
@@ -162,7 +157,7 @@ export async function refreshSession() {
 }
 
 export async function logoutService(fromAll = false) {
-  const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshToken = (await getSecureCredentials())?.refreshToken;
 
   // Reminders are device-local and must not survive either logout path.
   await cancelAllIdeaReminders();
@@ -216,7 +211,7 @@ export async function handleAccountVerification(code: string) {
       code,
       verificationToken,
     });
-    await AsyncStorage.multiRemove(['temp_user_id', VERIFICATION_TOKEN_KEY]);
+    await AsyncStorage.removeMany(['temp_user_id', VERIFICATION_TOKEN_KEY]);
     return response;
   } catch (error) {
     throw error;

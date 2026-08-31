@@ -34,8 +34,7 @@ const DateWeatherCard = ({ selectedDate, onOpenCalendar }: DateWeatherCardProps)
         start={cardGradientStart}
         end={cardGradientEnd}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <View style={{ gap: 4 }}>
+        <View style={{ minWidth: 0, gap: 4, padding: 20 }}>
             <View
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
             >
@@ -46,15 +45,22 @@ const DateWeatherCard = ({ selectedDate, onOpenCalendar }: DateWeatherCardProps)
               {currentMonth} {currentDayNumber}
             </H1>
             <MutedText>{currentYear}</MutedText>
-          </View>
-          <View>
-            <WeatherModal />
-          </View>
+        </View>
+        <View
+          style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            width: 108,
+            minWidth: 0,
+          }}
+        >
+          <WeatherModal />
         </View>
         <Pressable
           accessibilityRole="button"
           onPress={onOpenCalendar}
-          style={{ alignItems: 'center', paddingVertical: 8 }}
+          style={{ alignItems: 'center', marginTop: 8, paddingVertical: 8 }}
         >
           <MutedText>Tap to view calendar</MutedText>
         </Pressable>

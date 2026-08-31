@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Modal,
+  Pressable,
   View,
   TouchableWithoutFeedback,
   StyleSheet,
@@ -68,26 +69,39 @@ const MyModal = ({
         onRequestClose={onClose}
         statusBarTranslucent
       >
-        <TouchableWithoutFeedback onPress={onClose}>
-          <OverlayStyles>
+        <OverlayStyles>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close modal"
+            onPress={onClose}
+            style={StyleSheet.absoluteFill}
+          >
             <BlurView
               style={StyleSheet.absoluteFill}
               blurType="dark"
               blurAmount={4}
               reducedTransparencyFallbackColor="white"
+              pointerEvents="none"
             />
-            {keyboardAware ? <KeyboardAvoidingView
+          </Pressable>
+          {keyboardAware ? <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               pointerEvents="box-none"
               style={StyleSheet.absoluteFill}
             >
-              <TouchableWithoutFeedback>
+              <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
                 <BottomPlacementStyles style={contentStyle}>
                   {modalHeader && renderHeader()}
                   {children}
                 </BottomPlacementStyles>
-              </TouchableWithoutFeedback>
-            </KeyboardAvoidingView> : <TouchableWithoutFeedback>
+              </View>
+            </KeyboardAvoidingView> : <View
+              pointerEvents="box-none"
+              style={[
+                StyleSheet.absoluteFill,
+                placement !== 'bottom' && styles.centeredContent,
+              ]}
+            >
               {placement === 'bottom' ? (
                 <BottomPlacementStyles style={contentStyle}>
                   {modalHeader && renderHeader()}
@@ -101,12 +115,18 @@ const MyModal = ({
                   {children}
                 </ModalContent>
               )}
-            </TouchableWithoutFeedback>}
-          </OverlayStyles>
-        </TouchableWithoutFeedback>
+            </View>}
+        </OverlayStyles>
       </Modal>
     </View>
   );
 };
 
 export default MyModal;
+
+const styles = StyleSheet.create({
+  centeredContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

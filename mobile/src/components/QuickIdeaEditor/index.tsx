@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, Switch, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { Alert, Keyboard, Linking, Pressable, ScrollView, Switch, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
 import { Check, ChevronDown, Clock, X } from 'lucide-react-native';
 import MyModal from '../modal';
 import CustomCalendar from '../Calender';
@@ -89,7 +89,19 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
     getAllProjectsService(userId).finally(() => setLoadingProjects(false));
   }, [userId, visible]);
 
-  const toggleReminder = async (value: boolean) => { setEnabled(value); if (value) await requestReminderPermission(); };
+  const toggleReminder = async (value: boolean) => {
+    if (!value) { setEnabled(false); return; }
+    const granted = await requestReminderPermission();
+    setEnabled(granted);
+    if (!granted) Alert.alert(
+      'Notifications are disabled',
+      'Ideas still work without notifications. Enable notifications in system settings to receive reminders.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      ],
+    );
+  };
   const save = async () => {
     if (!draft.trim()) return;
     setSubmitting(true);

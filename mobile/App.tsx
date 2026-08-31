@@ -6,11 +6,12 @@ import { Theme } from './src/components/theme';
 import MainNavigator from './src/router/MainNavigator';
 import { navigationRef } from './src/router/navigationRef';
 import AnimatedBootSplash from './src/components/AnimatedBootSplash';
+import { useAuthStore } from './src/store/auth.store';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
-  const [navigationReady, setNavigationReady] = useState(false);
   const [showBootAnimation, setShowBootAnimation] = useState(true);
+  const isHydrated = useAuthStore(state => state.isHydrated);
   useEffect(() => {
     const onBackPress = () => {
       if (navigationRef.isReady() && navigationRef.canGoBack()) {
@@ -39,22 +40,17 @@ function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.root}>
-        <SafeAreaView style={styles.safeArea}>
-          <NavigationContainer
-            onReady={() => {
-              setNavigationReady(true);
-            }}
-          >
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+          <NavigationContainer ref={navigationRef}>
             <StatusBar
               barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-              backgroundColor={Theme.colors.background}
             />
             <MainNavigator />
           </NavigationContainer>
         </SafeAreaView>
         {showBootAnimation && (
           <AnimatedBootSplash
-            ready={navigationReady}
+            ready={isHydrated}
             onAnimationEnd={() => setShowBootAnimation(false)}
           />
         )}

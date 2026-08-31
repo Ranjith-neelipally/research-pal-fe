@@ -63,18 +63,17 @@ const getIdeasHeading = (selectedDate: string) => {
 };
 
 const Ideas = ({ selectedDate, onSelectedDateChange }: IdeasProps) => {
-  const getUserId = useAuthStore.getState().getUserId;
-  const userId = getUserId();
+  const userId = useAuthStore(state => state.getUserId());
 
   const [isLoading, setIsLoading] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [noteAction, setNoteAction] = useState<'add' | 'edit' | null>(null);
-  const [menuTop, setMenuTop] = useState<number | null>(null);
+  const [, setMenuTop] = useState<number | null>(null);
 
   const [notes, setNotes] = useState<QuickNote[]>([]);
   const [editingNote, setEditingNote] = useState<QuickNote | null>(null);
 
-  const containerRef = useRef<View | null>(null);
+  const containerRef = useRef<React.ElementRef<typeof View> | null>(null);
   const itemRefs = useRef<Record<string, any>>({});
 
   const setAddNewButtonVisible = useAddNewButtonActionsStore(
@@ -90,7 +89,7 @@ const Ideas = ({ selectedDate, onSelectedDateChange }: IdeasProps) => {
     setIsLoading(true);
     try {
       const res = await getQuickNotesService({ userId, date });
-      setNotes(res?.data?.userIdeas || []);
+      setNotes(('data' in res ? res.data?.userIdeas : []) || []);
     } catch {
       setNotes([]);
     } finally {
@@ -110,8 +109,7 @@ const Ideas = ({ selectedDate, onSelectedDateChange }: IdeasProps) => {
   useFocusEffect(
     useCallback(() => {
       setAddNewButtonAction(() => setNoteAction('add'));
-      fetchNotes(selectedDate);
-    }, [fetchNotes, selectedDate, setAddNewButtonAction]),
+    }, [setAddNewButtonAction]),
   );
 
   useEffect(() => {
@@ -272,59 +270,6 @@ const Ideas = ({ selectedDate, onSelectedDateChange }: IdeasProps) => {
           )}
         </ScrollView>
 
-        {false && openMenuId && (
-          <Pressable
-            onPress={() => setOpenMenuId(null)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 2,
-            }}
-          />
-        )}
-
-        {false && openMenuId !== null &&
-          menuTop !== null &&
-          Number.isFinite(menuTop) &&
-          (() => {
-            const note = notes.find(n => n._id === openMenuId);
-            if (!note) return null;
-
-            return (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: Math.max(0, menuTop - 20),
-                  zIndex: 3,
-                  elevation: 10,
-                }}
-              >
-                <MoreOptionsCard>
-                  <MoreOption
-                    onPress={() => {
-                      handleEdit(note as NoteInterface);
-                      setOpenMenuId(null);
-                    }}
-                  >
-                    <MutedText>Edit</MutedText>
-                  </MoreOption>
-
-                  <MoreOption
-                    onPress={() => {
-                      handleDelete(note);
-                      setOpenMenuId(null);
-                    }}
-                  >
-                    <MutedText>Delete</MutedText>
-                  </MoreOption>
-                </MoreOptionsCard>
-              </View>
-            );
-          })()}
       </View>
 
       {userId && <QuickIdeaEditor visible={noteAction !== null} userId={userId} initialDate={selectedDate} note={noteAction === 'edit' ? editingNote : null} onClose={() => { setNoteAction(null); setEditingNote(null); }} onSaved={saved => {

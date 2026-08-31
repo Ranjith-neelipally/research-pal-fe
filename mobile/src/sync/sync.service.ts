@@ -78,7 +78,7 @@ export const processOutboxPush = async () => {
       conflicts,
       failed: 0,
     };
-  } catch (error) {
+  } catch {
     for (const operation of operations) {
       await markOutboxOperationFailed(operation.opId);
     }

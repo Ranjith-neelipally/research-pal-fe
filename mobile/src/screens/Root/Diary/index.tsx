@@ -52,13 +52,13 @@ const Diary = () => {
   const [selectedDate, _setSelectedDate] = useState<string | null>(today);
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [menuTop, setMenuTop] = useState<number | null>(null);
+  const [, setMenuTop] = useState<number | null>(null);
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
 
-  const containerRef = useRef<View | null>(null);
+  const containerRef = useRef<React.ElementRef<typeof View> | null>(null);
   const itemRefs = useRef<Record<string, any>>({});
 
   const handleAddButtonAction = () => {
@@ -84,7 +84,7 @@ const Diary = () => {
           page: pageToLoad,
         });
 
-        const newNotes: NoteInterface[] = res?.data?.userIdeas || [];
+        const newNotes: NoteInterface[] = ('data' in res ? res.data?.userIdeas : []) || [];
 
         setNotes(prev =>
           pageToLoad === 1 ? newNotes : [...prev, ...newNotes],
@@ -178,7 +178,8 @@ const Diary = () => {
     a.getDate() === b.getDate();
 
   const getDateLabel = (dateString: string): string => {
-    const date = new Date(dateString);
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? new Date(year, month - 1, day) : new Date(dateString);
     const currentDay = new Date();
 
     const yesterday = new Date(currentDay);
@@ -407,60 +408,6 @@ const Diary = () => {
           </MutedText>
         )}
 
-        {false && openMenuId && (
-          <Pressable
-            onPress={() => setOpenMenuId(null)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 2,
-            }}
-          />
-        )}
-
-        {false && openMenuId !== null &&
-          menuTop !== null &&
-          Number.isFinite(menuTop) &&
-          (() => {
-            const note = notes.find(n => n._id === openMenuId);
-            if (!note) return null;
-
-            return (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: Math.max(0, menuTop - 20),
-                  zIndex: 3,
-                  elevation: 10,
-                }}
-              >
-                <MoreOptionsCard>
-                  {note.reminderEnabled && !note.completed && <MoreOption onPress={() => { handleDone(note); setOpenMenuId(null); }}><MutedText>Mark as done</MutedText></MoreOption>}
-                  <MoreOption
-                    onPress={() => {
-                      handleEdit(note);
-                      setOpenMenuId(null);
-                    }}
-                  >
-                    <MutedText>Edit</MutedText>
-                  </MoreOption>
-
-                  <MoreOption
-                    onPress={() => {
-                      handleDelete(note);
-                      setOpenMenuId(null);
-                    }}
-                  >
-                    <MutedText>Delete</MutedText>
-                  </MoreOption>
-                </MoreOptionsCard>
-              </View>
-            );
-          })()}
       </View>
 
       {userId && selectedDate && <QuickIdeaEditor visible={action !== null} userId={userId} initialDate={selectedDate} note={action === 'edit' ? editingNote : null} onClose={() => { setAction(null); setEditingNote(null); }} onSaved={() => resetAndFetch()} />}

@@ -15,7 +15,7 @@ const VerificationScreen = () => {
     const navigation = useNavigation();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
-  const inputs = useRef<(TextInput | null)[]>([]);
+  const inputs = useRef<(React.ElementRef<typeof TextInput> | null)[]>([]);
 
   const handleOtpChange = (text: string, index: number) => {
     if (text.length > 1) return; // Only allow single digit

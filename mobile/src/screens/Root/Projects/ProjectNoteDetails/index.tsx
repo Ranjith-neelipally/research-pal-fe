@@ -569,7 +569,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
               <View style={{ paddingVertical: 16 }}>
                 <ActivityIndicator color="#35b164" />
               </View>
-            ) : null
+            ) : undefined
           }
         />
       )}

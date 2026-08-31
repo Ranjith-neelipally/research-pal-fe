@@ -8,6 +8,7 @@ import {
   Globe,
   KeyRound,
   LogOut,
+  Trash2,
   Mail,
   Monitor,
   Moon,
@@ -35,6 +36,11 @@ import { useToast } from "@/hooks/use-toast";
 import { logout, selectAuthUser } from "@/store/auth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchProjects, selectProjects, selectProjectsStatus } from "@/store/projects";
+import { clearProjects } from "@/store/projects";
+import { clearIdeas } from "@/store/ideas";
+import { clearSession } from "@/store/auth";
+import { confirmAccountDeletion, requestAccountDeletion } from "@/services/account";
+import { clearUserLocalData } from "@/services/clearUserLocalData";
 
 type ThemePreference = "dark" | "light" | "auto";
 type UnitPreference = "metric" | "imperial";
@@ -97,6 +103,29 @@ const ProfilePage = () => {
     createdAt: authUser?.createdAt || initialProfile.createdAt,
   } satisfies Profile);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<"closed" | "warning" | "otp">("closed");
+  const [deleteOtp, setDeleteOtp] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const sendDeleteCode = async () => {
+    setDeleteBusy(true); setDeleteError("");
+    try { await requestAccountDeletion(); setDeleteStep("otp"); }
+    catch (error) { setDeleteError(error instanceof Error ? error.message : "Unable to send a verification code."); }
+    finally { setDeleteBusy(false); }
+  };
+
+  const deleteAccount = async () => {
+    if (!/^\d{6}$/.test(deleteOtp)) return setDeleteError("Enter the 6-digit code.");
+    setDeleteBusy(true); setDeleteError("");
+    try {
+      await confirmAccountDeletion(deleteOtp);
+      clearUserLocalData();
+      dispatch(clearProjects()); dispatch(clearIdeas()); dispatch(clearSession());
+      navigate("/login", { replace: true });
+    } catch (error) { setDeleteError(error instanceof Error ? error.message : "We couldn't delete your account. Please try again."); }
+    finally { setDeleteBusy(false); }
+  };
 
   useEffect(() => {
     if (projectsStatus === "idle") {
@@ -290,6 +319,7 @@ const ProfilePage = () => {
                 navigate("/login", { replace: true });
               }}
             />
+            <ActionRow icon={Trash2} label="Delete account" destructive onClick={() => { setDeleteError(""); setDeleteStep("warning"); }} />
           </div>
         </section>
       </div>
@@ -300,6 +330,24 @@ const ProfilePage = () => {
         onOpenChange={setEditOpen}
         onSave={updateProfile}
       />
+      <Dialog open={deleteStep !== "closed"} onOpenChange={open => !open && !deleteBusy && setDeleteStep("closed")}>
+        <DialogContent>
+          {deleteStep === "warning" ? <>
+            <DialogHeader><DialogTitle>Delete your account permanently?</DialogTitle><DialogDescription>
+              Deleting your ResearchPal account permanently removes your profile and all data associated with your account, including projects, plots, observations, notes, ideas, photos, sessions, and other owned data.
+            </DialogDescription></DialogHeader>
+            <p className="text-sm font-semibold text-destructive">Once this is done, your ResearchPal profile and data cannot be recovered.</p>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            <DialogFooter><Button variant="outline" disabled={deleteBusy} onClick={() => setDeleteStep("closed")}>Cancel</Button><Button variant="destructive" disabled={deleteBusy} onClick={sendDeleteCode}>{deleteBusy ? "Sending…" : "Continue"}</Button></DialogFooter>
+          </> : <>
+            <DialogHeader><DialogTitle>Verify account deletion</DialogTitle><DialogDescription>We sent a 6-digit verification code to your registered email address.</DialogDescription></DialogHeader>
+            <Label htmlFor="delete-otp">6-digit code</Label><Input id="delete-otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={deleteOtp} onChange={e => setDeleteOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+            <p className="text-sm font-semibold text-destructive">This action permanently deletes your account and cannot be undone.</p>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            <DialogFooter><Button variant="outline" disabled={deleteBusy} onClick={() => setDeleteStep("closed")}>Cancel</Button><Button variant="ghost" disabled={deleteBusy} onClick={sendDeleteCode}>Resend code</Button><Button variant="destructive" disabled={deleteBusy || deleteOtp.length !== 6} onClick={deleteAccount}>{deleteBusy ? "Deleting…" : "Verify and delete"}</Button></DialogFooter>
+          </>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

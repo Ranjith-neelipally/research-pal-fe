@@ -41,7 +41,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="mobile-container bg-background min-h-screen flex flex-col">
+    <div className="mobile-container bg-background min-h-screen flex flex-col mx-auto">
       <div className="flex-1 px-6 py-12 flex flex-col justify-center">
         {/* Logo */}
         <div className="text-center mb-12 page-enter">
