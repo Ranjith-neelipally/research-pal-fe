@@ -32,6 +32,7 @@ import NotFound from "./screens/Public/NotFound";
 import LoginPage from "./screens/Auth/Login";
 import SignupPage from "./screens/Auth/SignUp";
 import ForgotPasswordPage from "./screens/Auth/ForgetPassword";
+import ResetPasswordPage from "./screens/Auth/ResetPassword";
 import { AccountDeletionPage, PrivacyPolicyPage } from "./screens/Public/Legal";
 
 setSessionExpiredHandler(() => {
@@ -46,7 +47,8 @@ const getRouteTitle = (pathname: string) => {
   if (pathname === "/login") return "ResearchPal | Login";
   if (pathname === "/signup") return "ResearchPal | Sign Up";
   if (pathname === "/forgot-password") return "ResearchPal | Forgot Password";
-  if (pathname === "/privacy") return "ResearchPal | Privacy Policy";
+  if (pathname === "/reset-password") return "ResearchPal | Reset Password";
+  if (pathname === "/privacy" || pathname === "/privacy-policy") return "ResearchPal | Privacy Policy";
   if (pathname === "/account-deletion") return "ResearchPal | Account Deletion";
   if (pathname === "/home") return "ResearchPal | Home";
   if (pathname === "/projects") return "ResearchPal | Projects";
@@ -75,7 +77,7 @@ const DocumentTitle = () => {
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
-  const shellHiddenPaths = new Set(["/", "/splash", "/login", "/signup", "/forgot-password", "/privacy", "/account-deletion"]);
+  const shellHiddenPaths = new Set(["/", "/splash", "/login", "/signup", "/forgot-password", "/reset-password", "/privacy", "/privacy-policy", "/account-deletion"]);
   const showShell = !shellHiddenPaths.has(location.pathname);
 
   return showShell ? <AppShell>{children}</AppShell> : <>{children}</>;
@@ -107,6 +109,7 @@ const App = () => (
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/account-deletion" element={<AccountDeletionPage />} />
                 <Route path="/" element={<IntroPage />} />

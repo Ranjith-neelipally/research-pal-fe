@@ -30,6 +30,7 @@ import {
   getPhotoIdsFromContent,
   PlotNote,
 } from './helpers';
+import { validateRequiredMaxLength } from '../../../../utils/apiValidation';
 
 const PlotNoteEditorScreen = ({ route }: any) => {
   const navigation = useNavigation<any>();
@@ -110,8 +111,13 @@ const PlotNoteEditorScreen = ({ route }: any) => {
       const content = formatContentForSave(noteContent);
       const photoIds = photos.map(photo => photo.id);
 
-      if (!content.length) {
-        setContentError('Add at least one note line before saving photos.');
+      const contentErrorMessage = validateRequiredMaxLength(
+        content.join('\n'),
+        2000,
+        'Note content',
+      );
+      if (contentErrorMessage) {
+        setContentError(contentErrorMessage);
         return;
       }
 
@@ -262,7 +268,7 @@ const PlotNoteEditorScreen = ({ route }: any) => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={24}
       >
         <ScrollView
@@ -271,6 +277,8 @@ const PlotNoteEditorScreen = ({ route }: any) => {
             paddingBottom: 120,
             gap: 16,
           }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           <View

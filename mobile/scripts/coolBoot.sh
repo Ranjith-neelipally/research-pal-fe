@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PROJECT_ROOT="$(pwd)"
 AVD_NAME="${AVD_NAME:-Pixel_6_Pro}"
-APP_ID="${APP_ID:-com.researchpalfrontend}"
+APP_ID="${APP_ID:-com.researchpal.app}"
 METRO_PORT="${METRO_PORT:-8081}"
 EMULATOR_GPU_MODE="${EMULATOR_GPU_MODE:-swiftshader_indirect}"
 EMULATOR_MEMORY_MB="${EMULATOR_MEMORY_MB:-2048}"

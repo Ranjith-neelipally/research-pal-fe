@@ -7,6 +7,8 @@ interface PlotInterface {
   replication: number;
   treatment: number;
   plotIndex: [number, number];
+  replicationName?: string;
+  treatmentName?: string;
   notesCount?: number;
   _id?: string;
   createdAt?: string;

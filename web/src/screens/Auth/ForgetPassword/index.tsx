@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { forgotPassword } from "@/store/auth";
 import { useAppDispatch } from "@/store/hooks";
+import { validateEmail } from "@/utils/authValidation";
 
 const ForgotPasswordPage = () => {
   const dispatch = useAppDispatch();
@@ -13,13 +14,18 @@ const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nextEmailError = validateEmail(email);
+    setEmailError(nextEmailError || "");
+    if (nextEmailError) return;
+
     setIsLoading(true);
 
     try {
-      await dispatch(forgotPassword({ email })).unwrap();
+      await dispatch(forgotPassword({ email: email.trim() })).unwrap();
       setIsLoading(false);
       setIsSubmitted(true);
     } catch (error) {
@@ -66,11 +72,15 @@ const ForgotPasswordPage = () => {
                     type="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError("");
+                    }}
                     className="pl-12 h-12 bg-secondary border-border rounded-xl"
                     required
                   />
                 </div>
+                {emailError && <p className="text-sm text-destructive">{emailError}</p>}
               </div>
 
               <Button

@@ -8,6 +8,7 @@ import { createProjectWithPlots } from "@/store/projects";
 import { useAppDispatch } from "@/store/hooks";
 import { checkProjectTitleExistsService } from "@/services/projects";
 import { ProjectLocationPicker } from "@/components/ProjectLocationPicker";
+import { validateRequiredMaxLength } from "@/utils/apiValidation";
 
 interface PlotData {
   id: string;
@@ -29,6 +30,7 @@ const CreateProjectPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingTitle, setIsCheckingTitle] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [locationError, setLocationError] = useState("");
   const [projectData, setProjectData] = useState({
     name: "",
     location: "",
@@ -62,7 +64,11 @@ const CreateProjectPage = () => {
   const handleNext = async () => {
     if (step === 1) {
       const title = projectData.name.trim();
-      if (!title) return;
+      const error = validateRequiredMaxLength(title, 100, "Project title");
+      if (error) {
+        setTitleError(error);
+        return;
+      }
 
       setIsCheckingTitle(true);
       setTitleError("");
@@ -90,6 +96,13 @@ const CreateProjectPage = () => {
     }
 
     if (step < 3) {
+      if (step === 2) {
+        const error = validateRequiredMaxLength(projectData.location, 200, "Location");
+        if (error) {
+          setLocationError(error);
+          return;
+        }
+      }
       setStep(step + 1);
     } else {
       setIsSaving(true);
@@ -137,9 +150,9 @@ const CreateProjectPage = () => {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return projectData.name.trim().length > 0;
+        return !validateRequiredMaxLength(projectData.name, 100, "Project title");
       case 2:
-        return projectData.location.trim().length > 0;
+        return !validateRequiredMaxLength(projectData.location, 200, "Location");
       case 3:
         return projectData.replications > 0 && projectData.treatments > 0;
       default:
@@ -218,8 +231,14 @@ const CreateProjectPage = () => {
                 </p>
                 <ProjectLocationPicker
                   value={projectData.location}
-                  onChange={(location) => setProjectData({ ...projectData, location })}
+                  onChange={(location) => {
+                    setProjectData({ ...projectData, location });
+                    if (locationError) setLocationError("");
+                  }}
                 />
+                {locationError ? (
+                  <p className="mt-2 text-xs font-medium text-destructive">{locationError}</p>
+                ) : null}
               </div>
             </div>
           )}

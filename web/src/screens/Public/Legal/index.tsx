@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { Leaf } from "lucide-react";
+import { PublicHeader } from "@/components/PublicHeader";
+import { PrivacyPolicyContent } from "./PrivacyPolicyContent";
 
 const LegalLayout = ({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) => (
   <main className="min-h-screen bg-background text-foreground px-6 py-12">
@@ -15,14 +17,15 @@ const LegalLayout = ({ title, updated, children }: { title: string; updated: str
 );
 
 export const PrivacyPolicyPage = () => (
-  <LegalLayout title="Privacy Policy" updated="August 28, 2026">
-    <section><h2 className="text-xl font-semibold">What ResearchPal processes</h2><p>ResearchPal processes your email address, profile name and profession, authentication sessions, projects, plots, observations, notes and Ideas. Photos you attach are stored in the app's local sandbox. A project location label may be saved when you enter one or choose your approximate current location.</p></section>
-    <section><h2 className="text-xl font-semibold">How data is used</h2><p>We use this information to create and secure your account, synchronize your research workspace, display charts, support exports, deliver account emails, and provide optional Idea reminders and weather information. ResearchPal does not contain advertising SDKs and does not track you across other companies' apps or websites.</p></section>
-    <section><h2 className="text-xl font-semibold">Storage and service providers</h2><p>Account and research records are stored on ResearchPal's server database. Authentication and transactional email are processed by the ResearchPal backend and its configured database, hosting, and email providers. Weather and location searches contact Open-Meteo, ipwho.is, and OpenStreetMap Nominatim when those features are used. Data is transmitted over HTTPS in production.</p></section>
-    <section><h2 className="text-xl font-semibold">Retention and deletion</h2><p>We retain account data while your account is active. You can permanently delete your account from Settings → Security → Delete account. Account-owned server data and local ResearchPal data are deleted after email verification. Operational records may be retained only where required for security, fraud prevention, or law.</p></section>
-    <section><h2 className="text-xl font-semibold">Your choices</h2><p>Location, camera, photo, and notification access are optional and requested when you use the related feature. You can deny or later revoke these permissions in system settings. Manual location entry remains available without location access.</p></section>
-    <section><h2 className="text-xl font-semibold">Contact</h2><p>For privacy or support requests, contact the ResearchPal support address published on the ResearchPal website or store listing.</p></section>
-  </LegalLayout>
+  <div className="min-h-screen bg-gradient-to-br from-[#f0f4f8] via-[#e8eef5] to-[#dce4ed] text-slate-900 dark:from-[hsl(220,20%,6%)] dark:via-[hsl(220,20%,8%)] dark:to-[hsl(220,18%,10%)] dark:text-slate-100">
+    <PublicHeader />
+    <main className="px-6 py-12">
+      <article className="mx-auto max-w-3xl rounded-2xl border border-slate-200/60 bg-white/80 p-6 text-sm leading-6 text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:p-10">
+        <h1 className="mb-8 text-3xl font-bold text-slate-900 dark:text-slate-100">Privacy Policy</h1>
+        <PrivacyPolicyContent />
+      </article>
+    </main>
+  </div>
 );
 
 export const AccountDeletionPage = () => (

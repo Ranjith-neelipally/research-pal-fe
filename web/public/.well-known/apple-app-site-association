@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["KHFDTRJ342.com.researchpal.app"],
+        "components": [
+          {
+            "/": "/reset-password"
+          }
+        ]
+      }
+    ]
+  }
+}

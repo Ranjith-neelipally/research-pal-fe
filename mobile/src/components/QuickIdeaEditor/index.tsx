@@ -11,9 +11,10 @@ import { QuickNote } from '../../store/notes.store';
 import { useProjectsStore } from '../../store/Projects/Projects.store';
 import { usePlotsStore } from '../../store/Projects/plots.store';
 import { addQuickNoteService, updateQuickNotes } from '../../services/quickNotes';
-import { cancelIdeaReminders, pickIdeaReminderTime, requestReminderPermission, scheduleIdeaReminders } from '../../services/ideaReminders';
+import { canScheduleReminder, cancelIdeaReminders, isPastReminderDate, pickIdeaReminderTime, requestReminderPermission, scheduleIdeaReminders } from '../../services/ideaReminders';
 import { getAllProjectsService, getProjectDetailsService } from '../../services/Projects/Project';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validateMaxLength, validateRequiredMaxLength } from '../../utils/apiValidation';
 
 type Props = { visible: boolean; userId: string; initialDate: string; note?: QuickNote | null; onClose(): void; onSaved(note?: QuickNote): void };
 type SelectOption = { label: string; value: string | null };
@@ -53,15 +54,17 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
   const [projectPlots, setProjectPlots] = useState<typeof plots>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [draftError, setDraftError] = useState('');
   const [openSelector, setOpenSelector] = useState<'project' | 'plot' | null>(null);
   const usableHeight = window.height - insets.top - insets.bottom;
   const [modalMaxHeight, setModalMaxHeight] = useState(usableHeight * 0.75);
+  const reminderAllowed = canScheduleReminder(date, time);
 
   useEffect(() => {
     if (!visible) return;
     Keyboard.dismiss();
     setModalMaxHeight(usableHeight * 0.75);
-    setDate(note?.date || initialDate); setDraft(note?.idea || ''); setEnabled(note?.reminderEnabled ?? false);
+    setDate(note?.date || initialDate); setDraft(note?.idea || ''); setDraftError(''); setEnabled(note?.reminderEnabled ?? false);
     setTime(note?.reminderTime || ''); setProjectId(note?.projectId || null); setPlotId(note?.plotId || null); setOpenSelector(null);
   }, [visible, note, initialDate, usableHeight]);
 
@@ -89,8 +92,26 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
     getAllProjectsService(userId).finally(() => setLoadingProjects(false));
   }, [userId, visible]);
 
+  useEffect(() => {
+    if (enabled && !reminderAllowed) {
+      setEnabled(false);
+      setTime('');
+      setProjectId(null);
+      setPlotId(null);
+    }
+  }, [enabled, reminderAllowed]);
+
   const toggleReminder = async (value: boolean) => {
     if (!value) { setEnabled(false); return; }
+    if (!reminderAllowed) {
+      Alert.alert(
+        'Reminder unavailable',
+        isPastReminderDate(date)
+          ? 'Reminders cannot be set for past dates.'
+          : 'Choose a future reminder time for today.',
+      );
+      return;
+    }
     const granted = await requestReminderPermission();
     setEnabled(granted);
     if (!granted) Alert.alert(
@@ -103,18 +124,20 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
     );
   };
   const save = async () => {
-    if (!draft.trim()) return;
+    const error = validateRequiredMaxLength(draft, 1000, 'Idea content');
+    if (error) { setDraftError(error); return; }
     setSubmitting(true);
     try {
       if (note) await cancelIdeaReminders(note._id);
       const selectedTime = time;
-      const fields = { date, reminderEnabled: enabled, reminderTime: enabled && selectedTime ? selectedTime : null, projectId: enabled ? projectId : null, plotId: enabled && projectId ? plotId : null, completed: enabled ? (note?.completed ?? false) : false, notificationIds: [] as number[] };
+      const shouldSaveReminder = enabled && canScheduleReminder(date, selectedTime);
+      const fields = { date, reminderEnabled: shouldSaveReminder, reminderTime: shouldSaveReminder && selectedTime ? selectedTime : null, projectId: shouldSaveReminder ? projectId : null, plotId: shouldSaveReminder && projectId ? plotId : null, completed: shouldSaveReminder ? (note?.completed ?? false) : false, notificationIds: [] as number[] };
       const result = note ? await updateQuickNotes(userId, note._id, draft.trim(), fields) : await addQuickNoteService({ userId, idea: draft.trim(), ...fields });
       const resultData = 'data' in result ? result.data : undefined;
       const saved = (note ? resultData?.idea : resultData?.newNote) as QuickNote | undefined;
       if (!saved?._id) throw new Error('Idea was not returned by the server');
       let notificationIds: number[] = [];
-      if (enabled && !saved.completed) { notificationIds = await scheduleIdeaReminders(saved._id, saved.idea, date, selectedTime || null); await updateQuickNotes(userId, saved._id, saved.idea, { notificationIds }); }
+      if (shouldSaveReminder && !saved.completed) { notificationIds = await scheduleIdeaReminders(saved._id, saved.idea, date, selectedTime || null); if (notificationIds.length) await updateQuickNotes(userId, saved._id, saved.idea, { notificationIds }); }
       onSaved({ ...saved, ...fields, notificationIds }); onClose();
     } finally { setSubmitting(false); }
   };
@@ -124,7 +147,12 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
   const plotOptions: SelectOption[] = [{ label: 'None', value: null }, ...availablePlots.map(plot => ({ label: plot.title, value: plot._id! }))];
   const openTimePicker = async () => {
     const selected = await pickIdeaReminderTime(time || '07:00');
-    if (selected) setTime(selected);
+    if (!selected) return;
+    if (!canScheduleReminder(date, selected)) {
+      Alert.alert('Choose a future time', 'Reminder times for today must still be in the future.');
+      return;
+    }
+    setTime(selected);
   };
 
   const dismiss = () => {
@@ -142,10 +170,23 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
   return <MyModal visible={visible} onClose={dismiss} placement="bottom" keyboardAware contentStyle={{ maxHeight: modalMaxHeight }}>
     <View style={{ flexShrink: 1, gap: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><H3>Quick Idea</H3><TouchableWithoutFeedback onPress={dismiss}><X size={16} color={Theme.colors.mutedForeground} /></TouchableWithoutFeedback></View>
-      <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator contentContainerStyle={{ gap: 16, paddingBottom: 4 }}>
+      <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator contentContainerStyle={{ gap: 16, paddingBottom: 4 }}>
       {(!note || enabled) && <CustomCalendar selectedDate={date} onDayPress={d => setDate(d.dateString)} />}
-      <Input placeholder="Capture your thought..." multiline numberOfLines={3} value={draft} maxLength={200} onChangeText={setDraft} />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><TextSecondary>Remind me</TextSecondary><Switch value={enabled} onValueChange={toggleReminder} /></View>
+      <Input
+        placeholder="Capture your thought..."
+        multiline
+        numberOfLines={3}
+        value={draft}
+        maxLength={1000}
+        onChangeText={text => {
+          setDraft(text);
+          if (draftError && !validateMaxLength(text, 1000, 'Idea content')) {
+            setDraftError('');
+          }
+        }}
+        error={draftError}
+      />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><TextSecondary>Remind me</TextSecondary><Switch value={enabled} onValueChange={toggleReminder} disabled={!reminderAllowed} /></View>
       {enabled && <View style={{ gap: 12 }}>
       <View style={{ gap: 6 }}><MutedText>Time (optional)</MutedText>
         <Pressable accessibilityRole="button" accessibilityLabel={`Reminder time: ${formatTime(time)}`} onPress={openTimePicker} style={{ minHeight: 48, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#263244', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

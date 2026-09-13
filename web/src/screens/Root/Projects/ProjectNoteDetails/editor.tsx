@@ -10,8 +10,10 @@ import {
   updatePlotNoteService,
   type PlotNoteDto,
 } from "@/services/projects";
+import { validateRequiredMaxLength } from "@/utils/apiValidation";
 
 const noteText = (note: PlotNoteDto) => note.content?.[0]?.note?.join("\n") || "";
+const isObjectId = (value?: string) => /^[a-f\d]{24}$/i.test(value || "");
 
 const EditNotePage = () => {
   const navigate = useNavigate();
@@ -25,11 +27,21 @@ const EditNotePage = () => {
   const [noteDate, setNoteDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(!isNewNote);
   const [isSaving, setIsSaving] = useState(false);
+  const [contentError, setContentError] = useState("");
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
   const isOverLimit = wordCount > 5000;
 
   useEffect(() => {
     if (isNewNote || !projectId || !plotId || !noteId) return;
+    if (!isObjectId(plotId)) {
+      toast({
+        title: "Unable to load note",
+        description: "Plot link is invalid. Open notes from the project plot grid.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     getPlotNotesService({ projectId, plotId, limit: 100 })
@@ -66,13 +78,11 @@ const EditNotePage = () => {
   };
 
   const handleSave = async () => {
-    if (!projectId || !plotId || !noteId) return;
-    if (!content.trim()) {
-      toast({ title: "Please add some content", variant: "destructive" });
-      return;
-    }
+    if (!projectId || !plotId || !noteId || !isObjectId(plotId)) return;
+    const validationError = validateRequiredMaxLength(content, 2000, "Note content");
+    if (validationError) { setContentError(validationError); return; }
     if (isOverLimit) {
-      toast({ title: "Content exceeds 5000 words", variant: "destructive" });
+      setContentError("Note content is too long.");
       return;
     }
 
@@ -99,7 +109,7 @@ const EditNotePage = () => {
   };
 
   const handleDelete = async () => {
-    if (!projectId || !plotId || !noteId || isNewNote) return;
+    if (!projectId || !plotId || !noteId || isNewNote || !isObjectId(plotId)) return;
 
     try {
       await deletePlotNoteService(projectId, plotId, noteId);
@@ -158,12 +168,16 @@ const EditNotePage = () => {
           ) : (
             <textarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                if (contentError) setContentError("");
+              }}
               placeholder={`Write your observations here...\n\nUse bullet points for easy reading:\n- Observation 1\n- Observation 2\n- Measurement data`}
               className="w-full min-h-[250px] bg-secondary/50 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground leading-relaxed"
               autoFocus
             />
           )}
+          {contentError && <p className="text-sm text-destructive">{contentError}</p>}
           <div className="flex items-center justify-between">
             <span className={`text-xs ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>
               {wordCount.toLocaleString()}/5,000 words

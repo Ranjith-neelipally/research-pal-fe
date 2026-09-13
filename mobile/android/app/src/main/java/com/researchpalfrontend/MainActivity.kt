@@ -1,6 +1,7 @@
 package com.researchpalfrontend
 
 import android.os.Bundle
+import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -16,6 +17,7 @@ class MainActivity : ReactActivity() {
   override fun getMainComponentName(): String = "researchPalFrontEnd"
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     RNBootSplash.init(this, R.style.BootTheme)
     super.onCreate(null)
   }

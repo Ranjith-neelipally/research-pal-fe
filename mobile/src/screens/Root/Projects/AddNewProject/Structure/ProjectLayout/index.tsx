@@ -20,6 +20,7 @@ import Input from '../../../../../../components/Input';
 import Button from '../../../../../../components/Button';
 import { useAddNewProjectStore } from '../../../../../../store/Projects/AddNewProject.store';
 import { useStackScreenStore } from '../../../../../../services/StackScreen/stackScreen.store';
+import { validateMaxLength } from '../../../../../../utils/apiValidation';
 
 interface ProjectLayoutInputProps {
   replications: number;
@@ -125,6 +126,9 @@ const ProjectLayout = ({
 
   const handleOnSave = () => {
     if (!selectedPlot || !selectedPlotData) return;
+    const nameError = validateMaxLength(selectedPlotData.name, 100, 'Plot name');
+    if (nameError) return;
+
     setPlots(prev =>
       prev.map(plot => {
         const isSelected =
@@ -225,6 +229,7 @@ const ProjectLayout = ({
           setselectedPlot(null);
           setselectedPlotData(null);
         }}
+        keyboardAware
       >
         <View>
           <Input
@@ -243,6 +248,7 @@ const ProjectLayout = ({
                 prev ? { ...prev, name: text } : prev,
               )
             }
+            error={validateMaxLength(selectedPlotData?.name, 100, 'Plot name')}
           />
           <MutedText style={{ marginTop: 8 }}>
             Default{' '}

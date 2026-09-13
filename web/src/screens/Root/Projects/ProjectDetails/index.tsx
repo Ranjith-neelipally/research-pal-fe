@@ -116,6 +116,8 @@ const ProjectDetailPage = () => {
         color: plot.color,
         replication: plot.replication,
         treatment: plot.treatment,
+        plotIndex: plot.plotIndex,
+        persisted: true,
       })),
     [plots],
   );

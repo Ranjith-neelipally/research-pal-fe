@@ -1,4 +1,4 @@
-import { View, Text, Keyboard, ScrollView, TouchableWithoutFeedback, TextInput, TouchableOpacity, Image } from 'react-native'
+import { View, Text, Keyboard, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, TextInput, TouchableOpacity, Image } from 'react-native'
 import React, { useState, useRef } from 'react'
 import { Screen } from 'react-native-screens';
 import { H1, MutedText } from '../../../components/commonStyles/styles';
@@ -9,12 +9,14 @@ import { handleAccountVerification } from '../../../services/login';
 import { useNavigation } from '@react-navigation/native';
 import LoadingState from '../../../components/LoadingState';
 import { showApiErrorAlert } from '../../../services/apiError';
+import { validateVerificationCode } from '../../../utils/authValidation';
 
 
 const VerificationScreen = () => {
     const navigation = useNavigation();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [otpError, setOtpError] = useState('');
   const inputs = useRef<(React.ElementRef<typeof TextInput> | null)[]>([]);
 
   const handleOtpChange = (text: string, index: number) => {
@@ -23,6 +25,7 @@ const VerificationScreen = () => {
     const newOtp = [...otp];
     newOtp[index] = text;
     setOtp(newOtp);
+    if (otpError) setOtpError('');
 
     if (text && index < otp.length - 1) {
       inputs.current[index + 1]?.focus();
@@ -52,6 +55,11 @@ const VerificationScreen = () => {
 
   const handleVerify = async() => {
     const otpValue = otp.join('');
+    const validationError = validateVerificationCode(otpValue);
+    if (validationError) {
+      setOtpError(validationError);
+      return;
+    }
     setIsVerifying(true);
     try {
       const res = await handleAccountVerification(otpValue);
@@ -66,16 +74,23 @@ const VerificationScreen = () => {
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        flexGrow: 1,
-      }}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <LoginScreen>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <LoginScreen>
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: 24,
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <Screen>
             <LogoAndTitle>
               <IconContainer>
@@ -102,6 +117,7 @@ const VerificationScreen = () => {
                   />
                 ))}
               </View>
+              {otpError ? <Text style={{ color: 'red', marginBottom: 10 }}>{otpError}</Text> : null}
               <TouchableOpacity
                 style={{
                   backgroundColor: Theme.colors.primary,
@@ -129,9 +145,10 @@ const VerificationScreen = () => {
               </TouchableOpacity> */}
             </LoginForm>
           </Screen>
-        </TouchableWithoutFeedback>
-      </LoginScreen>
-    </ScrollView>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LoginScreen>
   )
 }
 

@@ -72,22 +72,60 @@ const ProjectsHeader = ({ customHeaderIcon }: ProjectsHeaderProps) => {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          width: '100%',
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+        <View
+          style={{
+            flex: 1,
+            flexShrink: 1,
+            minWidth: 0,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 18,
+          }}
+        >
           <TouchableOpacity onPress={handleBackPress}>
             <ArrowLeft color={Theme.colors.fontSecondary} height={24} />
           </TouchableOpacity>
 
-          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+          <View
+            style={{
+              flex: 1,
+              flexShrink: 1,
+              minWidth: 0,
+              flexDirection: 'row',
+              gap: 4,
+              alignItems: 'center',
+            }}
+          >
             {customHeaderIcon ?? headerIcon}
-            <View>
-              <SmallH1>{screenTitle || 'ProjectHeader'}</SmallH1>
+            <View style={{ flex: 1, flexShrink: 1, minWidth: 0 }}>
+              <SmallH1
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{ flexShrink: 1 }}
+              >
+                {screenTitle || 'ProjectHeader'}
+              </SmallH1>
               <View
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  minWidth: 0,
+                }}
               >
                 {headerSubIcon && getIcons(headerSubIcon)}
-                {headerSubtitle && <MutedText>{headerSubtitle}</MutedText>}
+                {headerSubtitle && (
+                  <MutedText
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{ flex: 1, flexShrink: 1 }}
+                  >
+                    {headerSubtitle}
+                  </MutedText>
+                )}
               </View>
             </View>
           </View>

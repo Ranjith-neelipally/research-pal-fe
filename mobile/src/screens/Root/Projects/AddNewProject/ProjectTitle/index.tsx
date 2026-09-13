@@ -16,6 +16,7 @@ import type { NavigationProp } from '@react-navigation/native';
 import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
 import { useStackScreenStore } from '../../../../../services/StackScreen/stackScreen.store';
 import { checkProjectTitleExistsService } from '../../../../../services/Projects/Project';
+import { validateRequiredMaxLength } from '../../../../../utils/apiValidation';
 
 const ProjectTitle = () => {
   const router = useNavigation<NavigationProp<any>>();
@@ -54,7 +55,9 @@ const ProjectTitle = () => {
 
   const handleContinue = async () => {
     const trimmedTitle = projectTitle.trim();
-    if (!trimmedTitle) {
+    const titleError = validateRequiredMaxLength(trimmedTitle, 100, 'Project title');
+    if (titleError) {
+      useAddNewProjectStore.getState().setErrorStatus(titleError);
       return;
     }
 
@@ -88,12 +91,13 @@ const ProjectTitle = () => {
     <Screen>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'android' ? 180 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           <View style={{ flex: 1, justifyContent: 'space-between' }}>

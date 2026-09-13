@@ -44,6 +44,8 @@ interface PhotoDetails {
   title: string;
   replication: number;
   treatment: number;
+  replicationName?: string;
+  treatmentName?: string;
   __v: number;
   ProjectTitle: string;
 }
@@ -318,7 +320,9 @@ const PhotosModel = ({
               <SmallMutedText>Project</SmallMutedText>
               <TextSecondary>{photoDetails?.ProjectTitle}</TextSecondary>
               <SmallMutedText>Replication</SmallMutedText>
-              <TextSecondary>{photoDetails?.replication}</TextSecondary>
+              <TextSecondary>{photoDetails?.replicationName || `R${photoDetails?.replication}`}</TextSecondary>
+              <SmallMutedText>Treatment</SmallMutedText>
+              <TextSecondary>{photoDetails?.treatmentName || `T${photoDetails?.treatment}`}</TextSecondary>
             </View>
           </View>
         )}

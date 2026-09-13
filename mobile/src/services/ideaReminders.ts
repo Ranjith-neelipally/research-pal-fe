@@ -18,6 +18,26 @@ export const reminderTimes = (date: string, customTime?: string | null) => {
   return [...new Set(values)].filter(time => time > Date.now());
 };
 
+const dateOnly = (value: Date) =>
+  new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+
+export const isPastReminderDate = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number);
+  if (!year || !month || !day) return false;
+  return new Date(year, month - 1, day).getTime() < dateOnly(new Date());
+};
+
+export const canScheduleReminder = (date: string, customTime?: string | null) =>
+  !isPastReminderDate(date) &&
+  (!customTime || reminderTimes(date, customTime).includes(
+    (() => {
+      const [year, month, day] = date.split('-').map(Number);
+      const [hour, minute] = customTime.split(':').map(Number);
+      return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+    })(),
+  )) &&
+  reminderTimes(date, customTime).length > 0;
+
 export async function requestReminderPermission() {
   return native ? native.requestPermission() : false;
 }
@@ -27,8 +47,10 @@ export async function pickIdeaReminderTime(initialTime?: string | null) {
 }
 export async function scheduleIdeaReminders(id: string, text: string, date: string, time?: string | null) {
   if (!native) return [];
+  const times = reminderTimes(date, time);
+  if (!times.length) return [];
   try {
-    return await native.schedule(id, text, reminderTimes(date, time));
+    return await native.schedule(id, text, times);
   } catch (error) {
     // Older debug APKs scheduled successfully, then failed while bridging the
     // boxed Kotlin Integer[] result. Cancellation is keyed by idea ID, so the

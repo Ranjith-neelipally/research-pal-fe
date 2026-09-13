@@ -8,6 +8,15 @@ import { navigationRef } from './src/router/navigationRef';
 import AnimatedBootSplash from './src/components/AnimatedBootSplash';
 import { useAuthStore } from './src/store/auth.store';
 
+const linking = {
+  prefixes: ['https://www.research-pal.com'],
+  config: {
+    screens: {
+      ResetPassword: 'reset-password',
+    },
+  },
+};
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [showBootAnimation, setShowBootAnimation] = useState(true);
@@ -41,7 +50,7 @@ function App() {
     <SafeAreaProvider>
       <View style={styles.root}>
         <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-          <NavigationContainer ref={navigationRef}>
+          <NavigationContainer ref={navigationRef} linking={linking}>
             <StatusBar
               barStyle={isDarkMode ? 'light-content' : 'dark-content'}
             />

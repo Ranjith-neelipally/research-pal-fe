@@ -22,6 +22,30 @@ export const createPlotsService = async (data: ProjectLayoutPayload) => {
   }
 };
 
+export const updatePlotDisplayMetadataService = async (
+  projectId: string,
+  plotId: string,
+  fields: {
+    title?: string;
+    replicationName?: string;
+    treatmentName?: string;
+  },
+) => {
+  try {
+    const res = await api.patch('/projects/plot', {
+      _id: plotId,
+      projectId,
+      ...fields,
+    });
+    return {
+      status: res.status,
+      data: res.data?.plot || res.data?.data || res.data,
+    };
+  } catch (error) {
+    return serviceError(error);
+  }
+};
+
 export const getPlotNoteService = async (
   projectId: string,
   userId: string,

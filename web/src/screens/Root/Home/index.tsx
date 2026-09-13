@@ -26,6 +26,7 @@ import {
   selectIdeasStatus,
 } from "@/store/ideas";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { validateRequiredMaxLength } from "@/utils/apiValidation";
 
 const HomePage = () => {
   const { toast } = useToast();
@@ -39,6 +40,7 @@ const HomePage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dateNote, setDateNote] = useState("");
   const [selectedIdeaDate, setSelectedIdeaDate] = useState<string | null>(null);
+  const [dateNoteError, setDateNoteError] = useState("");
   const today = selectedDate;
   const ideas: Idea[] = ideaEntities.map((idea) => ({
     id: idea.id,
@@ -95,9 +97,10 @@ const HomePage = () => {
 
   const handleSaveDateNote = async () => {
     const trimmedNote = dateNote.trim();
+    const validationError = validateRequiredMaxLength(trimmedNote, 1000, "Idea content");
 
-    if (!trimmedNote) {
-      toast({ title: "Add a note before saving", variant: "destructive" });
+    if (validationError) {
+      setDateNoteError(validationError);
       return;
     }
 
@@ -108,6 +111,7 @@ const HomePage = () => {
     try {
       await dispatch(createIdea({ content: trimmedNote, date: createdAt.toISOString() })).unwrap();
       setDateNote("");
+      setDateNoteError("");
       setIsDateNoteOpen(false);
       toast({ title: "Idea saved" });
     } catch (error) {
@@ -293,10 +297,14 @@ const HomePage = () => {
               </div>
               <Textarea
                 value={dateNote}
-                onChange={(event) => setDateNote(event.target.value)}
+                onChange={(event) => {
+                  setDateNote(event.target.value);
+                  if (dateNoteError) setDateNoteError("");
+                }}
                 placeholder="Write a quick observation for this date..."
                 className="min-h-40 resize-none rounded-2xl"
               />
+              {dateNoteError && <p className="text-sm text-destructive">{dateNoteError}</p>}
             </div>
           </div>
 

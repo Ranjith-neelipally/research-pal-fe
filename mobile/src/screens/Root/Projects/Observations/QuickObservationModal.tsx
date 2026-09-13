@@ -16,7 +16,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Hash, Plus, Type, X } from 
 import Input from '../../../../components/Input';
 import { Theme } from '../../../../components/theme';
 import type { Plot } from '../AddNewProject/Structure/helpers';
-import { buildGrid, getPlotDisplayName } from '../AddNewProject/Structure/helpers';
+import { buildGrid, getAssignmentDisplayName, getPlotDisplayName } from '../AddNewProject/Structure/helpers';
 import {
   bulkCreateObservationRecords,
   createObservationRecord,
@@ -24,6 +24,7 @@ import {
   listObservationTypes,
 } from '../../../../services/Observations';
 import type { ObservationDataType, ObservationType } from '../../../../types/observation';
+import { validateMaxLength, validateNumberValue, validateRequiredMaxLength } from '../../../../utils/apiValidation';
 
 type Step = 'pick' | 'new' | 'scope' | 'plot' | 'capture';
 type Scope = 'single' | 'all';
@@ -59,6 +60,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   const [pending, setPending] = useState<PendingRecord[]>([]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const valueRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const sortedPlots = useMemo(() => orderedPlots(plots).filter(plot => plot._id), [plots]);
@@ -91,6 +93,15 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   };
 
   const parseValue = () => selected?.dataType === 'number' ? Number(value) : selected?.dataType === 'boolean' ? value === 'true' : value.trim();
+  const validateCapture = () => {
+    if (!selected) return 'Observation type is required.';
+    if (selected.dataType === 'number') return validateNumberValue(value);
+    if (selected.dataType === 'text') return validateRequiredMaxLength(value, 2000, 'Value');
+    if (selected.dataType === 'boolean' && value !== 'true' && value !== 'false') {
+      return 'Choose yes or no.';
+    }
+    return validateMaxLength(note, 2000, 'Note');
+  };
   const currentRecord = (): PendingRecord | null => !currentPlot?._id || !selected || value === '' ? null : ({
     plotId: currentPlot._id,
     value: parseValue(),
@@ -121,6 +132,8 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
     setPlotIndex(index); setValue(record ? String(record.value) : ''); setNote(record?.note || '');
   };
   const saveAndNext = () => {
+    const validationError = validateCapture();
+    if (validationError) { setFormError(validationError); return; }
     const record = currentRecord(); if (!record) return;
     if (scope === 'single') { void finish([record]); return; }
     setPending(items => [...items.filter(item => item.plotId !== record.plotId), record]);
@@ -137,7 +150,9 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
     goToPlot(plotIndex - 1);
   };
   const createType = async () => {
-    if (!name.trim() || saving) return;
+    const nameError = validateRequiredMaxLength(name, 100, 'Observation name');
+    const unitError = dataType === 'number' ? validateMaxLength(unit, 40, 'Unit') : undefined;
+    if (nameError || unitError || saving) { setFormError(nameError || unitError || ''); return; }
     setSaving(true);
     try {
       const created = await createObservationType({ projectId, name: name.trim(), dataType, unit: dataType === 'number' ? unit.trim() || undefined : undefined });
@@ -149,7 +164,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   const title = step === 'pick' ? 'What are you recording?' : step === 'new' ? 'New observation' : `${selected?.name}${selected?.unit ? ` · ${selected.unit}` : ''}`;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <Pressable onPress={close} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' }}>
         <Pressable onPress={event => event.stopPropagation()} style={{ height: '75%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.card, padding: 20 }}>
           {!(step === 'capture' && scope === 'all') && <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -157,7 +172,15 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
               <Text style={{ color: colors.muted, marginTop: 4 }}>{step === 'scope' ? 'How should this observation be taken?' : step === 'plot' ? 'Select the one plot you want to record.' : step === 'capture' ? scope === 'all' ? `Plot ${plotIndex + 1} of ${sortedPlots.length} · Round saved when you finish` : 'Record one selected plot' : 'Reusable structured field data for this project.'}</Text></View>
             <Pressable onPress={close} hitSlop={16}><X color={colors.muted} /></Pressable>
           </View>}
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} scrollEnabled={!(step === 'capture' && scope === 'all')} contentContainerStyle={step === 'capture' && scope === 'all' ? { flexGrow: 1 } : undefined}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              flexGrow: step === 'capture' && scope === 'all' ? 1 : undefined,
+              paddingBottom: keyboardVisible ? 28 : 0,
+            }}
+          >
             {step === 'pick' && <View style={{ gap: 10 }}>
               {types.map(type => <Pressable key={type.id} onPress={() => { setSelected(type); setStep('scope'); }} onLongPress={() => onViewObservation?.(type)} style={{ minHeight: 68, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '700', fontSize: 17 }}>{type.name}</Text><Text style={{ color: colors.muted, marginTop: 3 }}>{type.dataType === 'boolean' ? 'Yes / No' : type.dataType}{type.unit ? ` · ${type.unit}` : ''}</Text></View><Pressable onPress={event => { event.stopPropagation(); onViewObservation?.(type); }} hitSlop={8} style={{ paddingHorizontal: 12, paddingVertical: 8 }}><Text style={{ color: Theme.colors.primary, fontWeight: '700' }}>View data</Text></Pressable><ArrowRight color={Theme.colors.primary} />
@@ -166,11 +189,11 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
               {!!types.length && <Text style={{ color: colors.muted, textAlign: 'center', marginTop: 6 }}>Tap a row to capture another measurement session.</Text>}
             </View>}
             {step === 'new' && <View style={{ gap: 18 }}>
-              <Input label="Observation name" value={name} onChangeText={setName} placeholder="e.g. Plant Height" autoFocus />
+              <Input label="Observation name" value={name} onChangeText={text => { setName(text); setFormError(''); }} placeholder="e.g. Plant Height" autoFocus error={step === 'new' ? formError : undefined} />
               <Text style={{ color: colors.muted }}>Data type</Text><View style={{ flexDirection: 'row', gap: 8 }}>{([
                 ['number', Hash, 'Number'], ['text', Type, 'Text'], ['boolean', Check, 'Yes / No'],
               ] as const).map(([kind, Icon, label]) => <Pressable key={kind} onPress={() => setDataType(kind)} style={{ flex: 1, minHeight: 76, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: dataType === kind ? Theme.colors.primary : colors.border, backgroundColor: dataType === kind ? '#30a65b1f' : 'transparent' }}><Icon color={dataType === kind ? Theme.colors.primary : colors.muted} /><Text style={{ color: colors.text, marginTop: 6 }}>{label}</Text></Pressable>)}</View>
-              {dataType === 'number' && <Input label="Unit (optional)" value={unit} onChangeText={setUnit} placeholder="cm, kg, %, count" />}
+              {dataType === 'number' && <Input label="Unit (optional)" value={unit} onChangeText={text => { setUnit(text); setFormError(''); }} placeholder="cm, kg, %, count" />}
               <View style={{ flexDirection: 'row', gap: 10 }}><Pressable onPress={() => setStep('pick')} style={secondaryButton}><ArrowLeft color={colors.text} /><Text style={secondaryText}>Back</Text></Pressable><Pressable disabled={!name.trim() || saving} onPress={() => void createType()} style={[primaryButton, { opacity: !name.trim() || saving ? .5 : 1 }]}><Text style={primaryText}>{saving ? 'Saving…' : 'Continue'}</Text></Pressable></View>
             </View>}
             {step === 'scope' && <View style={{ gap: 12 }}>
@@ -203,7 +226,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
                       if (!plot?._id) return <View key={`empty-${rowIndex}-${columnIndex}`} style={emptyPlotCard} />;
                       const index = sortedPlots.findIndex(item => item._id === plot._id); const completed = pending.some(item => item.plotId === plot._id); const current = index === plotIndex; const wasSkipped = skipped.has(plot._id);
                       return <Pressable key={plot._id} onPress={() => goToPlot(index)} style={[plotCard, { borderColor: plot.color || colors.border }, current && currentPlotCard, completed && !current && completedPlotCard, wasSkipped && !completed && skippedPlotCard]}>
-                        <Text numberOfLines={1} style={[plotReplication, current && { color: Theme.colors.primary }]}>{getPlotDisplayName(plot)}</Text><Text numberOfLines={1} style={plotTreatment}>R{plot.replication} · T{plot.treatment}</Text>
+                        <Text numberOfLines={1} style={[plotReplication, current && { color: Theme.colors.primary }]}>{getPlotDisplayName(plot)}</Text><Text numberOfLines={1} style={plotTreatment}>{getAssignmentDisplayName(plot)}</Text>
                         {completed && <CheckCircle2 size={14} color={Theme.colors.primary} style={{ position: 'absolute', right: 7, top: 7 }} />}
                         {wasSkipped && !completed && <Text style={skippedLabel}>Skipped</Text>}
                       </Pressable>;
@@ -212,15 +235,16 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
                 </ScrollView>
               </ScrollView>
               {selected?.dataType === 'boolean' ? <View style={{ flexDirection: 'row', gap: 10 }}>{['true', 'false'].map(item => <Pressable key={item} onPress={() => setValue(item)} style={[largeChoiceButton, value === item && selectedChoice]}><Text style={{ color: value === item ? Theme.colors.primary : colors.text, fontSize: 20, fontWeight: '700' }}>{item === 'true' ? 'Yes' : 'No'}</Text></Pressable>)}</View> :
-                <View style={valueShell}><TextInput ref={valueRef} value={value} onChangeText={setValue} keyboardType={selected?.dataType === 'number' ? 'decimal-pad' : 'default'} returnKeyType="next" onSubmitEditing={saveAndNext} placeholder={selected?.dataType === 'number' ? '0.0' : 'Enter value'} placeholderTextColor="#56606d" style={valueInput} /><Text style={valueUnit}>{selected?.unit || 'Value'}</Text></View>}
+                <View style={valueShell}><TextInput ref={valueRef} value={value} onChangeText={text => { setValue(text); setFormError(''); }} keyboardType={selected?.dataType === 'number' ? 'decimal-pad' : 'default'} returnKeyType="next" onSubmitEditing={saveAndNext} placeholder={selected?.dataType === 'number' ? '0.0' : 'Enter value'} placeholderTextColor="#56606d" style={valueInput} /><Text style={valueUnit}>{selected?.unit || 'Value'}</Text></View>}
+              {!!formError && <Text style={{ color: '#f87171' }}>{formError}</Text>}
               <View style={{ flexDirection: 'row', gap: 8 }}><Pressable disabled={!plotIndex || saving} onPress={previous} style={[smallButton, { opacity: !plotIndex ? .45 : 1 }]}><ArrowLeft size={19} color={colors.text} /><Text style={secondaryText}>Back</Text></Pressable><Pressable disabled={saving} onPress={skip} style={smallButton}><Text style={secondaryText}>Skip</Text></Pressable><Pressable disabled={value === '' || saving} onPress={saveAndNext} style={[primaryButton, { flex: 1.7, opacity: value === '' || saving ? .45 : 1 }]}><Text style={primaryText}>Save & Next</Text></Pressable></View>
               <Pressable disabled={saving} onPress={() => pending.length ? void finish(pending) : close()} style={{ padding: 12 }}><Text style={finishText}>{saving ? 'Finishing…' : 'Finish Session'}</Text></Pressable>
             </View>}
             {step === 'capture' && scope === 'single' && currentPlot && <View style={{ gap: 16 }}>
               <View style={{ backgroundColor: '#30a65b18', borderWidth: 1, borderColor: '#30a65b55', borderRadius: 20, padding: 18 }}><Text style={{ color: colors.muted, textTransform: 'uppercase', fontSize: 11, letterSpacing: 1.5 }}>Current plot</Text><Text style={{ color: colors.text, fontSize: 27, fontWeight: '800', marginTop: 4 }}>{getPlotDisplayName(currentPlot)}</Text><Text style={{ color: colors.muted, marginTop: 4 }}>Treatment T{currentPlot.treatment} · Replication R{currentPlot.replication}</Text></View>
               <Text style={{ color: colors.muted }}>Value</Text>
-              {selected?.dataType === 'boolean' ? <View style={{ flexDirection: 'row', gap: 10 }}>{['true', 'false'].map(item => <Pressable key={item} onPress={() => setValue(item)} style={[choiceButton, value === item && selectedChoice]}><Text style={{ color: value === item ? Theme.colors.primary : colors.text, fontSize: 18 }}>{item === 'true' ? 'Yes' : 'No'}</Text></Pressable>)}</View> : <Input ref={valueRef} value={value} onChangeText={setValue} keyboardType={selected?.dataType === 'number' ? 'decimal-pad' : 'default'} returnKeyType="next" onSubmitEditing={saveAndNext} style={{ fontSize: 28 }} placeholder="Enter value" />}
-              <Input label="Note (optional)" value={note} onChangeText={setNote} placeholder="Add note" />
+              {selected?.dataType === 'boolean' ? <View style={{ flexDirection: 'row', gap: 10 }}>{['true', 'false'].map(item => <Pressable key={item} onPress={() => { setValue(item); setFormError(''); }} style={[choiceButton, value === item && selectedChoice]}><Text style={{ color: value === item ? Theme.colors.primary : colors.text, fontSize: 18 }}>{item === 'true' ? 'Yes' : 'No'}</Text></Pressable>)}</View> : <Input ref={valueRef} value={value} onChangeText={text => { setValue(text); setFormError(''); }} keyboardType={selected?.dataType === 'number' ? 'decimal-pad' : 'default'} returnKeyType="next" onSubmitEditing={saveAndNext} style={{ fontSize: 28 }} placeholder="Enter value" error={formError || undefined} />}
+              <Input label="Note (optional)" value={note} onChangeText={text => { setNote(text); setFormError(''); }} placeholder="Add note" />
               {scope === 'single' ? <View style={{ flexDirection: 'row', gap: 8 }}><Pressable disabled={saving} onPress={() => setStep('plot')} style={smallButton}><Text style={secondaryText}>Back</Text></Pressable><Pressable disabled={value === '' || saving} onPress={saveAndNext} style={[primaryButton, { flex: 1.5, opacity: value === '' || saving ? .45 : 1 }]}><Text style={primaryText}>{saving ? 'Saving…' : 'Save observation'}</Text></Pressable></View> : <>
                 <View style={{ flexDirection: 'row', gap: 8 }}><Pressable disabled={!plotIndex || saving} onPress={previous} style={[smallButton, { opacity: !plotIndex ? .45 : 1 }]}><Text style={secondaryText}>Previous</Text></Pressable><Pressable disabled={saving} onPress={skip} style={smallButton}><Text style={secondaryText}>Skip</Text></Pressable><Pressable disabled={value === '' || saving} onPress={saveAndNext} style={[primaryButton, { flex: 1.4, opacity: value === '' || saving ? .45 : 1 }]}><Text style={primaryText}>{saving ? 'Saving…' : plotIndex === sortedPlots.length - 1 ? 'Finish' : 'Save & Next'}</Text></Pressable></View>
                 {!!pending.length && <Pressable disabled={saving} onPress={() => void finish(pending)} style={{ padding: 12 }}><Text style={{ textAlign: 'center', color: Theme.colors.primary, fontWeight: '700' }}>Finish now · save {pending.length} values</Text></Pressable>}

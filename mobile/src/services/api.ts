@@ -7,7 +7,7 @@ import { cancelAllIdeaReminders } from './ideaReminders';
 import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
 export const API_BASE_URL = __DEV__
-  ? 'http://10.11.109.235:3000/'
+  ? 'http://10.68.192.79:3000/'
   : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -157,6 +157,9 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       !url.includes('auth/login') &&
       !url.includes('auth/sign-in') &&
+      !url.includes('auth/forgot-password') &&
+      !url.includes('auth/verify-reset-password') &&
+      !url.includes('auth/update-password') &&
       !url.includes('auth/refresh')
     ) {
       originalRequest._retry = true;

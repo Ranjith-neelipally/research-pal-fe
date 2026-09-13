@@ -1,8 +1,8 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/";
+// const API_BASE_URL =
+  // import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "researchpal_user";
 
@@ -117,6 +117,9 @@ api.interceptors.request.use(async (config) => {
     url.includes("/auth/login") ||
     url.includes("/auth/sign-in") ||
     url.includes("/auth/signup") ||
+    url.includes("/auth/forgot-password") ||
+    url.includes("/auth/verify-reset-password") ||
+    url.includes("/auth/update-password") ||
     url.includes("/auth/refresh");
   let token = getStoredAccessToken();
 

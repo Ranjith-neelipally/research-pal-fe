@@ -6,6 +6,7 @@ import {
   Alert,
   PermissionsAndroid,
   FlatList,
+  ScrollView,
   TouchableOpacity,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
@@ -23,6 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import { useAddNewProjectStore } from '../../../../../store/Projects/AddNewProject.store';
 import { useStackScreenStore } from '../../../../../services/StackScreen/stackScreen.store';
+import { validateRequiredMaxLength } from '../../../../../utils/apiValidation';
 
 type Coordinates = {
   latitude: number;
@@ -193,10 +195,10 @@ const ProjectLocation = () => {
   };
 
   const handleContinue = () => {
-    if (!location.trim()) {
-      const message = 'Location is required to continue.';
+    const message = validateRequiredMaxLength(location, 200, 'Location');
+    if (message) {
       setLocationError(message);
-      Alert.alert('Location required', message);
+      Alert.alert('Location', message);
       return;
     }
 
@@ -250,10 +252,15 @@ const ProjectLocation = () => {
     <Screen>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'android' ? 180 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
-        <View style={{ flex: 1, padding: 16 }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, padding: 16, paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+        >
           <View
             style={{
               backgroundColor: '#30a65b1a',
@@ -362,7 +369,7 @@ const ProjectLocation = () => {
           >
             Continue
           </Button>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );

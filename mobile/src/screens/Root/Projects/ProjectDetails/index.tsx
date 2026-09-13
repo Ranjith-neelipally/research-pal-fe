@@ -20,6 +20,7 @@ import {
   getTreatmentColor,
   Plot,
 } from '../AddNewProject/Structure/helpers';
+import { updatePlotDisplayMetadataService } from '../../../../services/Projects/Plot';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import ProjectStructure from './ProjectStructure';
 import MyModal from '../../../../components/modal';
@@ -189,6 +190,72 @@ function ProjectDetails({ route }: any) {
     console.log(plot);
   };
 
+  const updatePlotLabels = useCallback(
+    async (
+      type: 'replication' | 'treatment',
+      value: number,
+      name: string,
+    ) => {
+      const fields =
+        type === 'replication'
+          ? { replicationName: name }
+          : { treatmentName: name };
+      const affectedPlots = plotsData.filter(plot => plot[type] === value && plot._id);
+
+      setplotsData(current =>
+        current.map(plot =>
+          plot[type] === value
+            ? { ...plot, ...fields }
+            : plot,
+        ),
+      );
+
+      const results = await Promise.all(
+        affectedPlots.map(plot =>
+          updatePlotDisplayMetadataService(projectId, plot._id!, fields),
+        ),
+      );
+      const failed = results.find(result => result.status < 200 || result.status >= 300);
+      if (failed) {
+        await loadProjectDetails();
+        Alert.alert(
+          'Rename failed',
+          (failed as any).message || 'Unable to rename this label right now.',
+        );
+      }
+    },
+    [loadProjectDetails, plotsData, projectId],
+  );
+
+  const updatePlotName = useCallback(
+    async (plot: Plot, name: string) => {
+      const title = name.trim();
+      if (!plot._id || !title) {
+        Alert.alert('Rename failed', 'Enter a plot name before saving.');
+        return;
+      }
+
+      setplotsData(current =>
+        current.map(item =>
+          item._id === plot._id ? { ...item, title } : item,
+        ),
+      );
+
+      const result = await updatePlotDisplayMetadataService(projectId, plot._id, {
+        title,
+      });
+
+      if (result.status < 200 || result.status >= 300) {
+        await loadProjectDetails();
+        Alert.alert(
+          'Rename failed',
+          (result as any).message || 'Unable to rename this plot right now.',
+        );
+      }
+    },
+    [loadProjectDetails, projectId],
+  );
+
   const getMarkedDates = () => {
     const marked: Record<string, any> = {};
     const year = calendarMonth.year;
@@ -279,6 +346,8 @@ function ProjectDetails({ route }: any) {
         project={project}
         grid={grid}
         handlePlotPress={handlePlotPress}
+        onRenameLabel={updatePlotLabels}
+        onRenamePlot={updatePlotName}
       />
       <AddNew
         floating

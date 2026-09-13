@@ -449,6 +449,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
               alignItems: 'center',
               gap: 12,
               flex: 1,
+              minWidth: 0,
             }}
           >
             <TouchableOpacity
@@ -465,30 +466,39 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
             </TouchableOpacity>
 
             {!isDateMode && plotIndex ? (
-            <View
-              style={{
-                minWidth: 54,
-                height: 54,
-                borderRadius: 18,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingHorizontal: 8,
-                backgroundColor: plotColor || '#35b164',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>
-                {`R${plotIndex[0]} T${plotIndex[1]}`}
-              </Text>
-            </View>
+              <View
+                style={{
+                  minWidth: 54,
+                  height: 54,
+                  borderRadius: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  flexShrink: 0,
+                  backgroundColor: plotColor || '#35b164',
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>
+                  {`R${plotIndex[0]} T${plotIndex[1]}`}
+                </Text>
+              </View>
             ) : null}
 
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '700' }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}
+              >
                 {isDateMode
                   ? plotName || 'Notes by Date'
                   : plotName || `Plot R${plotIndex[0]}_T${plotIndex[1]}`}
               </Text>
-              <Text style={{ color: '#7b899d', fontSize: 16 }}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{ color: '#7b899d', fontSize: 14 }}
+              >
                 {isDateMode
                   ? date
                   : `${plotNotes.length} ${plotNotes.length === 1 ? 'note' : 'notes'}`}
@@ -508,6 +518,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
+                flexShrink: 0,
               }}
             >
               <Plus size={20} color="#101318" />

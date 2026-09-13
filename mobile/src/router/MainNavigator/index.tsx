@@ -9,12 +9,14 @@ import RootNavigator from '../RootNavigator';
 import ProjectsNavigator from '../ProjectsNavigator';
 import { refreshSession } from '../../services/login';
 import SettingsScreen from '../../screens/Root/Settings';
+import ResetPasswordScreen from '../../screens/Auth/ResetPassword';
 
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   ProjectCreation: undefined;
   Settings: undefined;
+  ResetPassword: { token?: string };
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -66,6 +68,7 @@ function MainNavigator() {
       ) : (
         <RootStack.Screen name="Auth" component={AuthNavigator} />
       )}
+      <RootStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </RootStack.Navigator>
   );
 }

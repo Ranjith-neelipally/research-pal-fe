@@ -268,7 +268,11 @@ const ProjectsData = () => {
                           color={Theme.colors.mutedForeground}
                           style={{ marginTop: 3 }}
                         />
-                        <SmallMutedText style={{ flex: 1 }}>
+                        <SmallMutedText
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={{ flex: 1, flexShrink: 1 }}
+                        >
                           {project.location}
                         </SmallMutedText>
                       </View>
@@ -380,6 +384,7 @@ const ProjectsData = () => {
         onClose={() => !isSaving && setEditingProject(null)}
         placement="bottom"
         modalHeader="Edit Project"
+        keyboardAware
       >
         <View style={{ gap: 16 }}>
           <Input

@@ -111,6 +111,7 @@ function validatePlots(plots: PlotPayload[], replicationsLimit: number, treatmen
     const replicationTreatmentKey = `${plot.replication}-${plot.treatment}`;
 
     if (!title) return "Every plot needs a title.";
+    if (title.length > 100) return `Plot title is too long: ${title}`;
     if (titles.has(title)) return `Duplicate plot title in request: ${title}`;
     if (indexes.has(indexKey)) return `Duplicate plotIndex in request: [${plot.plotIndex}]`;
     if (replicationTreatments.has(replicationTreatmentKey)) {

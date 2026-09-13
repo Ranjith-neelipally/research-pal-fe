@@ -2,10 +2,12 @@ import {
   View,
   TouchableWithoutFeedback,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Image,
 } from 'react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   LoginScreen,
   IconContainer,
@@ -26,8 +28,14 @@ import Button from '../../../components/Button';
 import { SignUp } from '../../../services/login';
 import { showApiErrorAlert } from '../../../services/apiError';
 import { useNavigation } from '@react-navigation/native';
+import {
+  validateBackendPassword,
+  validateEmail,
+  validateRequired,
+} from '../../../utils/authValidation';
 const Login = () => {
   const navigation = useNavigation();
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -37,6 +45,7 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [errors, setErrors] = useState<{
     firstName?: string;
     lastName?: string;
@@ -56,38 +65,25 @@ const Login = () => {
       confirmPassword?: string;
     } = {};
 
-    if (!firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+    newErrors.firstName = validateRequired(firstName, 'First name is required.');
+    newErrors.lastName = validateRequired(lastName, 'Last name is required.');
+    newErrors.username = validateRequired(username, 'Username is required.');
+    if (username.trim().length > 0 && username.trim().length < 3) {
+      newErrors.username = 'Username must be at least 3 characters.';
+    } else if (username.trim().length > 20) {
+      newErrors.username = 'Username must be 20 characters or fewer.';
     }
-
-    if (!lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
-
-    if (!username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
+    newErrors.email = validateEmail(email);
+    newErrors.password = validateBackendPassword(password);
 
     if (!confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = 'Please confirm your password.';
+    } else if (password.trim() !== confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Passwords do not match.';
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.values(newErrors).every(error => !error);
   };
 
   const handleSignUp = async () => {
@@ -95,11 +91,11 @@ const Login = () => {
     setIsLoading(true);
     try {
       const payload = {
-        firstName,
-        lastName,
-        email,
-        password,
-        userName: username,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        userName: username.trim(),
         createdDate: new Date().toISOString(),
       };
       const response = await SignUp(payload);
@@ -118,17 +114,47 @@ const Login = () => {
     navigation.navigate('Login' as never);
   };
 
+  const scrollLowerFieldsIntoView = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  };
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      setTimeout(scrollLowerFieldsIntoView, 80);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        flexGrow: 1,
-      }}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <LoginScreen>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <LoginScreen>
+      <KeyboardAvoidingView
+        style={{ flex: 1, width: '100%' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: keyboardVisible ? 280 : 24,
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <Screen>
             <LogoAndTitle>
               <IconContainer>
@@ -194,6 +220,7 @@ const Login = () => {
                 label="Email"
                 placeholder="you@example.com"
                 keyboardType="email-address"
+                onFocus={scrollLowerFieldsIntoView}
                 onChangeText={text => {
                   setEmail(text);
                   if (errors.email) {
@@ -208,6 +235,7 @@ const Login = () => {
                 label="Password"
                 placeholder="••••••••"
                 secureTextEntry={!showPassword}
+                onFocus={scrollLowerFieldsIntoView}
                 IconRight={
                   <TouchableWithoutFeedback
                     onPress={() => setShowPassword(!showPassword)}
@@ -233,6 +261,7 @@ const Login = () => {
                 label="Confirm Password"
                 placeholder="••••••••"
                 secureTextEntry={!showPassword}
+                onFocus={scrollLowerFieldsIntoView}
                 IconRight={
                   <TouchableWithoutFeedback
                     onPress={() => setShowPassword(!showPassword)}
@@ -275,9 +304,10 @@ const Login = () => {
               </View>
             </LoginForm>
           </Screen>
-        </TouchableWithoutFeedback>
-      </LoginScreen>
-    </ScrollView>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LoginScreen>
   );
 };
 

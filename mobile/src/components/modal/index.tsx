@@ -85,7 +85,7 @@ const MyModal = ({
             />
           </Pressable>
           {keyboardAware ? <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               pointerEvents="box-none"
               style={StyleSheet.absoluteFill}
             >

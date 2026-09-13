@@ -6,6 +6,8 @@ import type { PlotNote, NotesByDate } from "@/types/plotNote";
 import { useToast } from "@/hooks/use-toast";
 import { deletePlotNoteService, getPlotNotesService, type PlotNoteDto } from "@/services/projects";
 
+const isObjectId = (value?: string) => /^[a-f\d]{24}$/i.test(value || "");
+
 const mapPlotNote = (note: PlotNoteDto): PlotNote => {
   const createdAt = new Date(note.createdAt || Date.now());
   return {
@@ -30,6 +32,14 @@ const PlotNotesPage = () => {
 
   useEffect(() => {
     if (!projectId || !plotId) return;
+    if (!isObjectId(plotId)) {
+      toast({
+        title: "Unable to load notes",
+        description: "Plot link is invalid. Open notes from the project plot grid.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     getPlotNotesService({ projectId, plotId, limit: 100 })
@@ -62,6 +72,7 @@ const PlotNotesPage = () => {
   }, [plotNotes]);
 
   const handleAddNote = () => {
+    if (!isObjectId(plotId)) return;
     const plotTitleQuery = searchParams.get("plotTitle");
     navigate(
       `/projects/${projectId}/plot/${plotId}/note/new${
@@ -71,6 +82,7 @@ const PlotNotesPage = () => {
   };
 
   const handleEditNote = (noteId: string) => {
+    if (!isObjectId(plotId)) return;
     const plotTitleQuery = searchParams.get("plotTitle");
     navigate(
       `/projects/${projectId}/plot/${plotId}/note/${noteId}?from=plot${
@@ -80,7 +92,7 @@ const PlotNotesPage = () => {
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    if (!projectId || !plotId) return;
+    if (!projectId || !plotId || !isObjectId(plotId)) return;
 
     try {
       await deletePlotNoteService(projectId, plotId, noteId);

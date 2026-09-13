@@ -6,6 +6,8 @@ export interface Plot {
   title: string;
   color: string;
   customName?: string;
+  replicationName?: string;
+  treatmentName?: string;
   _id?: string;
 }
 
@@ -40,11 +42,29 @@ export const getPlotId = (replication: number, treatment: number) =>
   `plot-${replication}-${treatment}`;
 
 export const getPlotDisplayName = (
-  plot: Pick<Plot, 'replication' | 'treatment' | 'title' | 'customName'>,
-) =>
-  plot.customName?.trim() ||
-  plot.title?.trim() ||
-  getDefaultPlotName(plot.replication, plot.treatment);
+  plot: Pick<Plot, 'replication' | 'treatment' | 'title' | 'customName' | 'replicationName' | 'treatmentName'>,
+) => {
+  const customName = plot.customName?.trim();
+  if (customName) return customName;
+
+  const title = plot.title?.trim();
+  const defaultName = getDefaultPlotName(plot.replication, plot.treatment);
+  if (title && title !== defaultName) return title;
+
+  return getAssignmentDisplayName(plot);
+};
+
+export const getReplicationDisplayName = (
+  plot: Pick<Plot, 'replication' | 'replicationName'>,
+) => plot.replicationName?.trim() || `R${plot.replication}`;
+
+export const getTreatmentDisplayName = (
+  plot: Pick<Plot, 'treatment' | 'treatmentName'>,
+) => plot.treatmentName?.trim() || `T${plot.treatment}`;
+
+export const getAssignmentDisplayName = (
+  plot: Pick<Plot, 'replication' | 'treatment' | 'replicationName' | 'treatmentName'>,
+) => `${getReplicationDisplayName(plot)} - ${getTreatmentDisplayName(plot)}`;
 
 export const getPlotCustomName = (
   plot: Pick<Plot, 'replication' | 'treatment' | 'title' | 'customName'>,
@@ -77,6 +97,8 @@ export const generatePlots = (
         title: getDefaultPlotName(r, t),
         color: getTreatmentColor(t),
         customName: undefined,
+        replicationName: undefined,
+        treatmentName: undefined,
       });
     }
   }

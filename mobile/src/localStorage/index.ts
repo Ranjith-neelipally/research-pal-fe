@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, PermissionsAndroid, Platform } from 'react-native';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { executeSyncSql } from '../sync/sqlite/database';
@@ -148,6 +148,61 @@ export const cleanupProjectLocalData = async (
   );
 };
 
+const settingsAlert = (title: string, message: string) => {
+  Alert.alert(title, message, [
+    { text: 'Not now', style: 'cancel' },
+    { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+  ]);
+};
+
+const requestAndroidPermission = async (
+  permission: Parameters<typeof PermissionsAndroid.check>[0],
+  title: string,
+  message: string,
+  blockedTitle: string,
+) => {
+  const hasPermission = await PermissionsAndroid.check(permission);
+  if (hasPermission) return true;
+
+  const result = await PermissionsAndroid.request(permission, {
+    title,
+    message,
+    buttonPositive: 'Continue',
+    buttonNegative: 'Not now',
+  });
+
+  if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
+
+  if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+    settingsAlert(blockedTitle, 'You can allow ResearchPal access in system settings. Your existing notes and photos are unaffected.');
+  }
+
+  return false;
+};
+
+const ensureCameraPermission = async () => {
+  if (Platform.OS !== 'android') return true;
+  return requestAndroidPermission(
+    PermissionsAndroid.PERMISSIONS.CAMERA,
+    'Camera Permission',
+    'ResearchPal needs camera access to attach photos to notes.',
+    'Camera access is disabled',
+  );
+};
+
+const ensureGalleryPermission = async () => {
+  if (Platform.OS !== 'android') return true;
+  const permission = Number(Platform.Version) >= 33
+    ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+    : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+  return requestAndroidPermission(
+    permission,
+    'Photo Permission',
+    'ResearchPal needs photo access to attach images to notes.',
+    'Photo access is disabled',
+  );
+};
+
 export const usePhotoStorage = () => {
   const showPickerError = useCallback((error: unknown, capability: 'camera' | 'photos') => {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as any).code) : '';
@@ -161,6 +216,7 @@ export const usePhotoStorage = () => {
   const pickFromCamera = useCallback(async (): Promise<
     StoredPhoto[] | null
   > => {
+    if (!await ensureCameraPermission()) return null;
     let res;
     try { res = await launchCamera({ mediaType: 'photo' }); }
     catch (error) { showPickerError(error, 'camera'); return null; }
@@ -183,6 +239,7 @@ export const usePhotoStorage = () => {
   const pickFromGallery = useCallback(async (): Promise<
     StoredPhoto[] | null
   > => {
+    if (!await ensureGalleryPermission()) return null;
     let res;
     try { res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 0 }); }
     catch (error) { showPickerError(error, 'photos'); return null; }

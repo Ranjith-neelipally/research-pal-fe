@@ -2,6 +2,7 @@
 import { X, Image as ImageIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Idea } from "./IdeaCard";
+import { validateRequiredMaxLength } from "@/utils/apiValidation";
 
 interface CreateIdeaModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const CreateIdeaModal = ({
   editingIdea
 }: CreateIdeaModalProps) => {
   const [content, setContent] = useState("");
+  const [error, setError] = useState("");
   
   useEffect(() => {
     if (editingIdea) {
@@ -32,11 +34,15 @@ export const CreateIdeaModal = ({
   const isOverLimit = wordCount > maxWords;
   
   const handleSubmit = () => {
-    if (content.trim() && !isOverLimit) {
-      onSubmit(content);
-      setContent("");
-      onClose();
+    const validationError = validateRequiredMaxLength(content, 1000, "Idea content");
+    if (validationError || isOverLimit) {
+      setError(validationError || `Idea content must be ${maxWords} words or fewer.`);
+      return;
     }
+    onSubmit(content.trim());
+    setContent("");
+    setError("");
+    onClose();
   };
 
   const handleClose = () => {
@@ -76,11 +82,15 @@ export const CreateIdeaModal = ({
         <div className="px-5 pb-5">
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              if (error) setError("");
+            }}
             placeholder="Capture your thought..."
             className="w-full h-32 bg-secondary/50 rounded-2xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
             autoFocus
           />
+          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
           
           {/* Word count */}
           <div className="flex items-center justify-between mt-3">

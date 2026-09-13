@@ -2,8 +2,10 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,6 +47,7 @@ import {
 import { getAllProjectsService } from '../../../services/Projects/Project';
 import { useProjectsStore } from '../../../store/Projects/Projects.store';
 import { clearUserLocalData, confirmAccountDeletion, requestAccountDeletion } from '../../../services/accountDeletion';
+import { validateChangePassword } from '../../../utils/authValidation';
 
 type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | null;
 type Session = {
@@ -112,6 +115,10 @@ export default function SettingsScreen() {
   const [profession, setProfession] = useState(authUser?.profession || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [passwordErrors, setPasswordErrors] = useState<{
+    currentPassword?: string;
+    newPassword?: string;
+  }>({});
   const [saving, setSaving] = useState(false);
   const [deleteOtp, setDeleteOtp] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -207,16 +214,16 @@ export default function SettingsScreen() {
   };
 
   const doPasswordChange = async () => {
-    if (newPassword.length < 8)
-      return Alert.alert(
-        'Change password',
-        'New password must contain at least 8 characters.',
-      );
+    const nextErrors = validateChangePassword(currentPassword, newPassword);
+    setPasswordErrors(nextErrors);
+    if (Object.values(nextErrors).some(Boolean)) return;
+
     setSaving(true);
     try {
       await changePassword(currentPassword, newPassword);
       setCurrentPassword('');
       setNewPassword('');
+      setPasswordErrors({});
       setSheet(null);
       Alert.alert(
         'Password changed',
@@ -407,10 +414,20 @@ export default function SettingsScreen() {
         onRequestClose={() => setSheet(null)}
       >
         <Pressable style={styles.backdrop} onPress={() => setSheet(null)} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          {sheet === 'edit' && (
-            <>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+        >
+          <View style={styles.sheet}>
+            <View style={styles.handle} />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.sheetContent}
+            >
+              {sheet === 'edit' && (
+                <>
               <H3>Edit Profile</H3>
               <MutedText>
                 Email is your account identity and cannot be changed here.
@@ -438,10 +455,10 @@ export default function SettingsScreen() {
                   {saving ? 'Saving…' : 'Save changes'}
                 </TextSecondary>
               </Pressable>
-            </>
-          )}
-          {sheet === 'password' && (
-            <>
+                </>
+              )}
+              {sheet === 'password' && (
+                <>
               <H3>Change Password</H3>
               <TextInput
                 secureTextEntry
@@ -449,16 +466,32 @@ export default function SettingsScreen() {
                 placeholder="Current password"
                 placeholderTextColor={Theme.colors.mutedForeground}
                 value={currentPassword}
-                onChangeText={setCurrentPassword}
+                onChangeText={text => {
+                  setCurrentPassword(text);
+                  if (passwordErrors.currentPassword) {
+                    setPasswordErrors(prev => ({ ...prev, currentPassword: undefined }));
+                  }
+                }}
               />
+              {passwordErrors.currentPassword ? (
+                <MutedText style={styles.errorText}>{passwordErrors.currentPassword}</MutedText>
+              ) : null}
               <TextInput
                 secureTextEntry
                 style={styles.input}
                 placeholder="New password (8+ characters)"
                 placeholderTextColor={Theme.colors.mutedForeground}
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={text => {
+                  setNewPassword(text);
+                  if (passwordErrors.newPassword) {
+                    setPasswordErrors(prev => ({ ...prev, newPassword: undefined }));
+                  }
+                }}
               />
+              {passwordErrors.newPassword ? (
+                <MutedText style={styles.errorText}>{passwordErrors.newPassword}</MutedText>
+              ) : null}
               <Pressable
                 style={styles.primaryButton}
                 onPress={doPasswordChange}
@@ -468,10 +501,10 @@ export default function SettingsScreen() {
                   {saving ? 'Updating…' : 'Update password'}
                 </TextSecondary>
               </Pressable>
-            </>
-          )}
-          {sheet === 'sessions' && (
-            <>
+                </>
+              )}
+              {sheet === 'sessions' && (
+                <>
               <H3>Active Sessions</H3>
               {loadingSessions ? (
                 <ActivityIndicator color={Theme.colors.primary} />
@@ -492,10 +525,10 @@ export default function SettingsScreen() {
                   </View>
                 ))
               )}
-            </>
-          )}
-          {sheet === 'signout' && (
-            <>
+                </>
+              )}
+              {sheet === 'signout' && (
+                <>
               <H3>Sign Out</H3>
               <Pressable
                 style={styles.sheetAction}
@@ -517,20 +550,20 @@ export default function SettingsScreen() {
               >
                 <MutedText>Cancel</MutedText>
               </Pressable>
-            </>
-          )}
-          {sheet === 'deleteWarning' && (
-            <>
+                </>
+              )}
+              {sheet === 'deleteWarning' && (
+                <>
               <H3>Delete your account permanently?</H3>
               <MutedText>Deleting your ResearchPal account permanently removes your profile and all data associated with your account. This includes projects, plots, observations, notes, ideas, photos, sessions, and other ResearchPal data owned by this account.</MutedText>
               <TextSecondary style={styles.danger}>Once this is done, your ResearchPal profile and data cannot be recovered.</TextSecondary>
               {deleteError ? <TextSecondary style={styles.danger}>{deleteError}</TextSecondary> : null}
               <Pressable style={styles.dangerButton} disabled={saving} onPress={sendDeleteCode}><TextSecondary>{saving ? 'Sending…' : 'Continue'}</TextSecondary></Pressable>
               <Pressable style={styles.sheetAction} disabled={saving} onPress={() => setSheet(null)}><MutedText>Cancel</MutedText></Pressable>
-            </>
-          )}
-          {sheet === 'deleteOtp' && (
-            <>
+                </>
+              )}
+              {sheet === 'deleteOtp' && (
+                <>
               <H3>Verify account deletion</H3>
               <MutedText>We sent a 6-digit verification code to your registered email address.</MutedText>
               <TextInput style={styles.input} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} placeholder="6-digit code" placeholderTextColor={Theme.colors.mutedForeground} value={deleteOtp} onChangeText={value => setDeleteOtp(value.replace(/\D/g, '').slice(0, 6))} />
@@ -539,9 +572,11 @@ export default function SettingsScreen() {
               <Pressable style={styles.dangerButton} disabled={saving || deleteOtp.length !== 6} onPress={deleteAccount}><TextSecondary>{saving ? 'Deleting…' : 'Verify and delete'}</TextSecondary></Pressable>
               <Pressable style={styles.sheetAction} disabled={saving} onPress={sendDeleteCode}><TextSecondary>Resend code</TextSecondary></Pressable>
               <Pressable style={styles.sheetAction} disabled={saving} onPress={() => setSheet(null)}><MutedText>Cancel</MutedText></Pressable>
-            </>
-          )}
-        </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -594,8 +629,10 @@ const styles = StyleSheet.create({
   rowStart: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   pressed: { opacity: 0.6 },
   danger: { color: '#e46d6d' },
+  errorText: { color: '#e46d6d', marginTop: -8 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
+    maxHeight: '88%',
     backgroundColor: '#1d2330',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -603,6 +640,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 14,
   },
+  sheetContent: { gap: 14, paddingBottom: 8 },
   handle: {
     width: 42,
     height: 4,

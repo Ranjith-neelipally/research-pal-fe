@@ -6,6 +6,7 @@
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { validateMaxLength } from "@/utils/apiValidation";
 
 interface PlotData {
   id: string;
@@ -34,6 +35,7 @@ export const PlotConfigModal = ({
   const [customName, setCustomName] = useState("");
   const [selectedReplication, setSelectedReplication] = useState(1);
   const [selectedTreatment, setSelectedTreatment] = useState(1);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (plot) {
@@ -45,6 +47,11 @@ export const PlotConfigModal = ({
 
   const handleSave = () => {
     if (!plot) return;
+    const validationError = validateMaxLength(customName, 100, "Plot name");
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     onSave({
       id: plot.id,
       customName,
@@ -72,10 +79,14 @@ export const PlotConfigModal = ({
             <input
               type="text"
               value={customName}
-              onChange={(e) => setCustomName(e.target.value)}
+              onChange={(e) => {
+                setCustomName(e.target.value);
+                if (error) setError("");
+              }}
               placeholder={plot.id}
               className="w-full bg-secondary/50 rounded-xl p-3 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
             />
+            {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
             <p className="text-xs text-muted-foreground mt-1">
               Default: {plot.id}
             </p>

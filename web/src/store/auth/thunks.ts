@@ -120,6 +120,28 @@ export const forgotPassword = createAsyncThunk<void, { email: string }, { reject
   },
 );
 
+export const verifyResetPassword = createAsyncThunk<void, { token: string }, { rejectValue: string }>(
+  "auth/verifyResetPassword",
+  async ({ token }, { rejectWithValue }) => {
+    try {
+      await api.post("/auth/verify-reset-password", { token });
+    } catch (error) {
+      return rejectWithValue(normalizeError(error));
+    }
+  },
+);
+
+export const updatePassword = createAsyncThunk<void, { token: string; password: string }, { rejectValue: string }>(
+  "auth/updatePassword",
+  async ({ token, password }, { rejectWithValue }) => {
+    try {
+      await api.post("/auth/update-password", { token, password });
+    } catch (error) {
+      return rejectWithValue(normalizeError(error));
+    }
+  },
+);
+
 export const logout = createAsyncThunk<void, { fromAll?: boolean } | undefined, { state: RootState }>(
   "auth/logout",
   async (payload, { getState }) => {

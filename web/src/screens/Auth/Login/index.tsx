@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { login } from "@/store/auth";
 import { useAppDispatch } from "@/store/hooks";
+import { validateBackendPassword, validateEmail } from "@/utils/authValidation";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -16,13 +17,25 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  const validateForm = () => {
+    const nextErrors = {
+      email: validateEmail(email),
+      password: validateBackendPassword(password),
+    };
+    setErrors(nextErrors);
+    return Object.values(nextErrors).every(error => !error);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     setIsLoading(true);
 
     try {
-      await dispatch(login({ email, password })).unwrap();
+      await dispatch(login({ email: email.trim(), password: password.trim() })).unwrap();
       setIsLoading(false);
       toast({
         title: "Welcome back!",
@@ -62,11 +75,15 @@ const LoginPage = () => {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                }}
                 className="pl-12 h-12 bg-secondary border-border rounded-xl"
                 required
               />
             </div>
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-2">
@@ -77,7 +94,10 @@ const LoginPage = () => {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
+                }}
                 className="pl-12 pr-12 h-12 bg-secondary border-border rounded-xl"
                 required
               />
@@ -89,6 +109,7 @@ const LoginPage = () => {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
           </div>
 
           <div className="text-right">

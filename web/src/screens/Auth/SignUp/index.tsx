@@ -6,6 +6,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { signup, verifyEmail } from "@/store/auth";
 import { useAppDispatch } from "@/store/hooks";
+import {
+  validateBackendPassword,
+  validateEmail,
+  validateRequired,
+  validateVerificationCode,
+} from "@/utils/authValidation";
 
 const SignupPage = () => {
   const navigate = useNavigate();
@@ -22,27 +28,53 @@ const SignupPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [showVerification, setShowVerification] = useState(false);
+  const [errors, setErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    verificationCode?: string;
+  }>({});
+
+  const validateSignupForm = () => {
+    const nextErrors: typeof errors = {
+      firstName: validateRequired(firstName, "First name is required."),
+      lastName: validateRequired(lastName, "Last name is required."),
+      username: validateRequired(username, "Username is required."),
+      email: validateEmail(email),
+      password: validateBackendPassword(password),
+    };
+
+    if (username.trim().length > 0 && username.trim().length < 3) {
+      nextErrors.username = "Username must be at least 3 characters.";
+    } else if (username.trim().length > 20) {
+      nextErrors.username = "Username must be 20 characters or fewer.";
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = "Please confirm your password.";
+    } else if (password.trim() !== confirmPassword.trim()) {
+      nextErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setErrors(nextErrors);
+    return Object.values(nextErrors).every(error => !error);
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "Please make sure your passwords match.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!validateSignupForm()) return;
 
     setIsLoading(true);
 
     try {
       await dispatch(
         signup({
-          email,
-          password,
-          userName: username || `${firstName} ${lastName}`.trim(),
+          email: email.trim(),
+          password: password.trim(),
+          userName: username.trim(),
         }),
       ).unwrap();
       setIsLoading(false);
@@ -63,10 +95,14 @@ const SignupPage = () => {
 
   const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    const verificationCodeError = validateVerificationCode(verificationCode);
+    setErrors(prev => ({ ...prev, verificationCode: verificationCodeError }));
+    if (verificationCodeError) return;
+
     setIsLoading(true);
 
     try {
-      await dispatch(verifyEmail({ code: verificationCode })).unwrap();
+      await dispatch(verifyEmail({ code: verificationCode.trim() })).unwrap();
       setIsLoading(false);
       toast({
         title: "Email verified",
@@ -104,10 +140,18 @@ const SignupPage = () => {
                 inputMode="numeric"
                 placeholder="Enter code"
                 value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value);
+                  if (errors.verificationCode) {
+                    setErrors(prev => ({ ...prev, verificationCode: undefined }));
+                  }
+                }}
                 className="h-11 bg-secondary border-border rounded-xl text-sm"
                 required
               />
+              {errors.verificationCode && (
+                <p className="text-sm text-destructive">{errors.verificationCode}</p>
+              )}
             </div>
             <Button
               type="submit"
@@ -129,11 +173,15 @@ const SignupPage = () => {
                   type="text"
                   placeholder="First"
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={(e) => {
+                    setFirstName(e.target.value);
+                    if (errors.firstName) setErrors(prev => ({ ...prev, firstName: undefined }));
+                  }}
                   className="pl-10 h-11 bg-secondary border-border rounded-xl text-sm"
                   required
                 />
               </div>
+              {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
             </div>
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground">Last Name</label>
@@ -143,11 +191,15 @@ const SignupPage = () => {
                   type="text"
                   placeholder="Last"
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={(e) => {
+                    setLastName(e.target.value);
+                    if (errors.lastName) setErrors(prev => ({ ...prev, lastName: undefined }));
+                  }}
                   className="pl-10 h-11 bg-secondary border-border rounded-xl text-sm"
                   required
                 />
               </div>
+              {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
             </div>
           </div>
 
@@ -159,11 +211,15 @@ const SignupPage = () => {
                 type="text"
                 placeholder="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errors.username) setErrors(prev => ({ ...prev, username: undefined }));
+                }}
                 className="pl-10 h-11 bg-secondary border-border rounded-xl text-sm"
                 required
               />
             </div>
+            {errors.username && <p className="text-sm text-destructive">{errors.username}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -174,11 +230,15 @@ const SignupPage = () => {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors(prev => ({ ...prev, email: undefined }));
+                }}
                 className="pl-10 h-11 bg-secondary border-border rounded-xl text-sm"
                 required
               />
             </div>
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -189,7 +249,10 @@ const SignupPage = () => {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors(prev => ({ ...prev, password: undefined }));
+                }}
                 className="pl-10 pr-10 h-11 bg-secondary border-border rounded-xl text-sm"
                 required
               />
@@ -201,6 +264,7 @@ const SignupPage = () => {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -211,7 +275,12 @@ const SignupPage = () => {
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (errors.confirmPassword) {
+                    setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                  }
+                }}
                 className="pl-10 pr-10 h-11 bg-secondary border-border rounded-xl text-sm"
                 required
               />
@@ -223,6 +292,9 @@ const SignupPage = () => {
                 {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {errors.confirmPassword && (
+              <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+            )}
           </div>
 
           <Button
