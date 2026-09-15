@@ -190,19 +190,6 @@ const ensureCameraPermission = async () => {
   );
 };
 
-const ensureGalleryPermission = async () => {
-  if (Platform.OS !== 'android') return true;
-  const permission = Number(Platform.Version) >= 33
-    ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-    : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-  return requestAndroidPermission(
-    permission,
-    'Photo Permission',
-    'ResearchPal needs photo access to attach images to notes.',
-    'Photo access is disabled',
-  );
-};
-
 export const usePhotoStorage = () => {
   const showPickerError = useCallback((error: unknown, capability: 'camera' | 'photos') => {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as any).code) : '';
@@ -239,7 +226,6 @@ export const usePhotoStorage = () => {
   const pickFromGallery = useCallback(async (): Promise<
     StoredPhoto[] | null
   > => {
-    if (!await ensureGalleryPermission()) return null;
     let res;
     try { res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 0 }); }
     catch (error) { showPickerError(error, 'photos'); return null; }

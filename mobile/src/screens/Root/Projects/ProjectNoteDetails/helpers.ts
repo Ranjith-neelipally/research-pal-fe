@@ -12,6 +12,7 @@ export interface PlotNote {
   plotId: string;
   userId: string;
   title?: string;
+  date?: string;
   content?: string | string[] | PlotNoteContentEntry[] | null;
   photoIds?: string[];
   createdAt: string;

@@ -61,6 +61,10 @@ const Login = () => {
     navigation.navigate('SignUp' as never);
   };
 
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgetPassword' as never);
+  };
+
   const keepFocusedInputVisible = () => {
     if (focusedFieldRef.current !== 'password') return;
 
@@ -170,7 +174,9 @@ const Login = () => {
                 />
                 <View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Button variant="tertiary">Forgot password? </Button>
+                    <Button variant="tertiary" onPress={handleForgotPassword}>
+                      Forgot password?
+                    </Button>
                   </View>
                   <Button onPress={handleLogin} disabled={isLoading}>
                     {isLoading ? 'Signing In...' : 'Sign In'}

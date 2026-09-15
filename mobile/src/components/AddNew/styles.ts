@@ -16,7 +16,7 @@ export const StyledAddNewButton = styled.TouchableOpacity<{
     $floating
       ? `
           position: absolute;
-          right: 16px;
+          right: 5px;
           bottom: ${$bottomOffset ?? 24}px;
           z-index: 100;
         `
@@ -24,8 +24,8 @@ export const StyledAddNewButton = styled.TouchableOpacity<{
       ? ''
       : `
           position: absolute;
-          left: 100%;
-          bottom: 170%;
+          right: 0;
+          bottom: 200%;
         `}
   elevation: 10;
   shadow-color: ${Theme.colors.primary};

@@ -8,6 +8,7 @@ export interface Plot {
   customName?: string;
   replicationName?: string;
   treatmentName?: string;
+  notesCount?: number;
   _id?: string;
 }
 

@@ -84,7 +84,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
   const sortNotes = useCallback((notes: PlotNote[]) =>
     [...notes].sort(
       (first, second) =>
-        new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime(),
+        new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime(),
     ), []);
 
   const mergeNotes = useCallback((currentNotes: PlotNote[], incomingNotes: PlotNote[]) => {
@@ -197,7 +197,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
   );
 
   const totalNotesByDay = plotNotes.reduce<Record<string, number>>((acc, note) => {
-    const label = getDayLabel(note.updatedAt);
+    const label = getDayLabel(note.date || note.createdOfflineAt || note.createdAt);
     acc[label] = (acc[label] || 0) + 1;
     return acc;
   }, {});
@@ -206,7 +206,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
   let lastDayLabel = '';
 
   plotNotes.forEach(note => {
-    const dayLabel = getDayLabel(note.updatedAt);
+    const dayLabel = getDayLabel(note.date || note.createdOfflineAt || note.createdAt);
 
     if (dayLabel !== lastDayLabel) {
       listData.push({
@@ -334,7 +334,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
             ) : null}
             <FileText size={16} color="#8d98aa" />
             <Text style={{ color: '#8d98aa', fontSize: 14 }}>
-              {formatTime(note.updatedAt)}
+              {formatTime(note.createdAt)}
             </Text>
           </View>
 

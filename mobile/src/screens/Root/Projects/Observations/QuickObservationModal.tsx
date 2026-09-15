@@ -2,9 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -21,10 +19,12 @@ import {
   bulkCreateObservationRecords,
   createObservationRecord,
   createObservationType,
-  listObservationTypes,
 } from '../../../../services/Observations';
 import type { ObservationDataType, ObservationType } from '../../../../types/observation';
 import { validateMaxLength, validateNumberValue, validateRequiredMaxLength } from '../../../../utils/apiValidation';
+import { useKeyboardInsets } from '../../../../hooks/useKeyboardInsets';
+import { useObservationsStore } from '../../../../store/observations.store';
+import LoadingState from '../../../../components/LoadingState';
 
 type Step = 'pick' | 'new' | 'scope' | 'plot' | 'capture';
 type Scope = 'single' | 'all';
@@ -46,8 +46,8 @@ const orderedPlots = (plots: Plot[]) => [...plots].sort((a, b) =>
 
 export default function QuickObservationModal({ visible, projectId, plots, onClose, onSaved, onViewObservation }: Props) {
   const { height: screenHeight } = useWindowDimensions();
+  const { keyboardInset, keyboardVisible } = useKeyboardInsets();
   const [step, setStep] = useState<Step>('pick');
-  const [types, setTypes] = useState<ObservationType[]>([]);
   const [selected, setSelected] = useState<ObservationType>();
   const [name, setName] = useState('');
   const [dataType, setDataType] = useState<ObservationDataType>('number');
@@ -61,7 +61,11 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const observationCache = useObservationsStore(state => state.byProjectId[projectId]);
+  const fetchObservationTypes = useObservationsStore(state => state.fetchObservationTypes);
+  const setProjectObservationTypes = useObservationsStore(state => state.setProjectObservationTypes);
+  const types = observationCache?.types || [];
+  const isLoadingTypes = observationCache?.isLoading || (!observationCache?.loaded && !observationCache?.error);
   const valueRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const sortedPlots = useMemo(() => orderedPlots(plots).filter(plot => plot._id), [plots]);
   const captureGrid = useMemo(() => {
@@ -71,25 +75,27 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
   }, [sortedPlots]);
   const currentPlot = scope === 'single' ? sortedPlots.find(plot => plot._id === singlePlotId) : sortedPlots[plotIndex];
   const expandedMapHeight = Math.max(90, Math.min(260, screenHeight * .75 - 370));
+  const sheetMaxHeight = Math.max(260, screenHeight - keyboardInset - 32);
 
   useEffect(() => {
-    if (!visible) return;
-    listObservationTypes(projectId).then(setTypes).catch(error => Alert.alert('Unable to load observations', error.message));
-  }, [projectId, visible]);
+    if (!visible || observationCache?.loaded || observationCache?.isLoading) return;
+    fetchObservationTypes(projectId).catch(error => Alert.alert('Unable to load observations', error.message));
+  }, [fetchObservationTypes, observationCache?.isLoading, observationCache?.loaded, projectId, visible]);
 
   useEffect(() => {
     if (step === 'capture') setTimeout(() => valueRef.current?.focus(), 180);
   }, [plotIndex, step]);
 
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-    return () => { showSubscription.remove(); hideSubscription.remove(); };
-  }, []);
-
   const close = () => {
     setStep('pick'); setSelected(undefined); setName(''); setDataType('number'); setUnit('');
     setScope('all'); setSinglePlotId(''); setPlotIndex(0); setValue(''); setNote(''); setPending([]); setSkipped(new Set()); setSaving(false); onClose();
+  };
+  const closeOrDismissKeyboard = () => {
+    if (keyboardVisible) {
+      Keyboard.dismiss();
+      return;
+    }
+    close();
   };
 
   const parseValue = () => selected?.dataType === 'number' ? Number(value) : selected?.dataType === 'boolean' ? value === 'true' : value.trim();
@@ -156,23 +162,23 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
     setSaving(true);
     try {
       const created = await createObservationType({ projectId, name: name.trim(), dataType, unit: dataType === 'number' ? unit.trim() || undefined : undefined });
-      setTypes(items => [created, ...items]); setSelected(created); setStep('scope');
+      setProjectObservationTypes(projectId, [created, ...types]); setSelected(created); setStep('scope');
     } catch (error: any) { Alert.alert('Could not create observation', error.message || String(error)); }
     finally { setSaving(false); }
   };
 
   const title = step === 'pick' ? 'What are you recording?' : step === 'new' ? 'New observation' : `${selected?.name}${selected?.unit ? ` · ${selected.unit}` : ''}`;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Pressable onPress={close} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' }}>
-        <Pressable onPress={event => event.stopPropagation()} style={{ height: '75%', borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.card, padding: 20 }}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeOrDismissKeyboard}>
+        <Pressable onPress={closeOrDismissKeyboard} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009', paddingBottom: keyboardInset }}>
+        <Pressable onPress={event => event.stopPropagation()} style={{ height: keyboardVisible ? undefined : '75%', maxHeight: sheetMaxHeight, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.card, padding: 20 }}>
           {!(step === 'capture' && scope === 'all') && <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
             <View style={{ flex: 1 }}><Text style={{ color: colors.text, fontSize: 24, fontWeight: '700' }}>{title}</Text>
               <Text style={{ color: colors.muted, marginTop: 4 }}>{step === 'scope' ? 'How should this observation be taken?' : step === 'plot' ? 'Select the one plot you want to record.' : step === 'capture' ? scope === 'all' ? `Plot ${plotIndex + 1} of ${sortedPlots.length} · Round saved when you finish` : 'Record one selected plot' : 'Reusable structured field data for this project.'}</Text></View>
-            <Pressable onPress={close} hitSlop={16}><X color={colors.muted} /></Pressable>
+            <Pressable onPress={closeOrDismissKeyboard} hitSlop={16}><X color={colors.muted} /></Pressable>
           </View>}
           <ScrollView
+            style={{ flexShrink: 1 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
@@ -182,6 +188,7 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
             }}
           >
             {step === 'pick' && <View style={{ gap: 10 }}>
+              {isLoadingTypes && <LoadingState label="Loading observations..." />}
               {types.map(type => <Pressable key={type.id} onPress={() => { setSelected(type); setStep('scope'); }} onLongPress={() => onViewObservation?.(type)} style={{ minHeight: 68, padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '700', fontSize: 17 }}>{type.name}</Text><Text style={{ color: colors.muted, marginTop: 3 }}>{type.dataType === 'boolean' ? 'Yes / No' : type.dataType}{type.unit ? ` · ${type.unit}` : ''}</Text></View><Pressable onPress={event => { event.stopPropagation(); onViewObservation?.(type); }} hitSlop={8} style={{ paddingHorizontal: 12, paddingVertical: 8 }}><Text style={{ color: Theme.colors.primary, fontWeight: '700' }}>View data</Text></Pressable><ArrowRight color={Theme.colors.primary} />
               </Pressable>)}
@@ -253,7 +260,6 @@ export default function QuickObservationModal({ visible, projectId, plots, onClo
           </ScrollView>
         </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }

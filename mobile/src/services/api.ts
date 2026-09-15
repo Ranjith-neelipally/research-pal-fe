@@ -7,7 +7,7 @@ import { cancelAllIdeaReminders } from './ideaReminders';
 import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
 export const API_BASE_URL = __DEV__
-  ? 'http://10.68.192.79:3000/'
+  ? 'http://192.168.31.231:3000/'
   : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ACCESS_TOKEN_KEY = 'access_token';

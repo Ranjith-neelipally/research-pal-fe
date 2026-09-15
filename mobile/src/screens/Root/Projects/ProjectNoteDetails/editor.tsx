@@ -31,9 +31,12 @@ import {
   PlotNote,
 } from './helpers';
 import { validateRequiredMaxLength } from '../../../../utils/apiValidation';
+import { useNoteEventsStore } from '../../../../store/noteEvents.store';
+import { toLocalDateString } from '../../../../utils/common';
 
 const PlotNoteEditorScreen = ({ route }: any) => {
   const navigation = useNavigation<any>();
+  const notifyNoteCreated = useNoteEventsStore(state => state.notifyNoteCreated);
   const { projectId, plotId, userId, plotName, note } = route.params as {
     projectId: string;
     plotId: string;
@@ -131,7 +134,14 @@ const PlotNoteEditorScreen = ({ route }: any) => {
           photoIds,
         );
       } else {
-        await addPlotNoteService(projectId, plotId, content, userId, photoIds);
+        const response = await addPlotNoteService(projectId, plotId, content, userId, photoIds);
+        if (response.status >= 200 && response.status < 300 && 'data' in response) {
+          notifyNoteCreated({
+            projectId,
+            plotId,
+            date: response.data?.date || toLocalDateString(new Date()),
+          });
+        }
       }
 
       navigation.goBack();
@@ -238,8 +248,8 @@ const PlotNoteEditorScreen = ({ route }: any) => {
               >
                 <CalendarDays size={14} color="#7b899d" />
                 <Text style={{ color: '#7b899d', fontSize: 14 }}>
-                  {selectedPlotNote?.updatedAt
-                    ? formatDate(selectedPlotNote.updatedAt)
+                  {selectedPlotNote
+                    ? formatDate(selectedPlotNote.date || selectedPlotNote.createdOfflineAt || selectedPlotNote.createdAt)
                     : plotName || 'Plot Notes'}
                 </Text>
               </View>

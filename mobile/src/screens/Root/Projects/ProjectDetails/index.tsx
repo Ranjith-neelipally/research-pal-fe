@@ -4,7 +4,7 @@ import {
   deleteProjectService,
   getProjectDetailsService,
 } from '../../../../services/Projects/Project';
-import React, { useCallback, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   H1,
   Screen,
@@ -29,6 +29,9 @@ import LoadingState from '../../../../components/LoadingState';
 import QuickObservationModal from '../Observations/QuickObservationModal';
 import AddNew from '../../../../components/AddNew';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useObservationsStore } from '../../../../store/observations.store';
+import { Theme } from '../../../../components/theme';
+import { useNoteEventsStore } from '../../../../store/noteEvents.store';
 
 function ProjectDetails({ route }: any) {
   const { projectId } = route.params;
@@ -43,6 +46,9 @@ function ProjectDetails({ route }: any) {
   const setAddNewButtonActionsVisible = useAddNewButtonActionsStore(
     state => state.setAddNewButtonActionsVisible,
   );
+  const fetchObservationTypes = useObservationsStore(state => state.fetchObservationTypes);
+  const lastCreatedNote = useNoteEventsStore(state => state.lastCreatedNote);
+  const appliedNoteEventIds = useRef<Set<number>>(new Set());
 
   const [plotsData, setplotsData] = useState<Plot[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
@@ -88,7 +94,8 @@ function ProjectDetails({ route }: any) {
 
   React.useEffect(() => {
     loadProjectDetails();
-  }, [loadProjectDetails]);
+    fetchObservationTypes(projectId).catch(() => undefined);
+  }, [fetchObservationTypes, loadProjectDetails, projectId]);
 
   React.useEffect(() => {
     const projectsTabNavigation = navigation.getParent();
@@ -176,6 +183,29 @@ function ProjectDetails({ route }: any) {
     project?.replicationsCount || 0,
     project?.treatmentsCount || 0,
   );
+  const totalNotes = plotsData.reduce(
+    (sum, plot) => sum + (plot.notesCount ?? 0),
+    0,
+  );
+
+  useEffect(() => {
+    if (!lastCreatedNote || lastCreatedNote.projectId !== projectId) return;
+    if (appliedNoteEventIds.current.has(lastCreatedNote.id)) return;
+
+    appliedNoteEventIds.current.add(lastCreatedNote.id);
+    setplotsData(current =>
+      current.map(plot =>
+        plot._id === lastCreatedNote.plotId
+          ? { ...plot, notesCount: (plot.notesCount ?? 0) + 1 }
+          : plot,
+      ),
+    );
+    setAvailableDates(current =>
+      current.includes(lastCreatedNote.date)
+        ? current
+        : [...current, lastCreatedNote.date].sort((a, b) => b.localeCompare(a)),
+    );
+  }, [lastCreatedNote, projectId]);
 
   const handlePlotPress = (plot: Plot | null) => () => {
     if (!plot) return;
@@ -269,18 +299,10 @@ function ProjectDetails({ route }: any) {
       ).padStart(2, '0')}`;
       if (availableDates.includes(dateStr)) {
         marked[dateStr] = {
+          marked: true,
+          dotColor: Theme.colors.primary,
           disabled: false,
           disableTouchEvent: false,
-          customStyles: {
-            container: {
-              backgroundColor: '#30a65b',
-              borderRadius: 8,
-            },
-            text: {
-              color: '#101318',
-              fontWeight: '700',
-            },
-          },
         };
       } else {
         marked[dateStr] = { disabled: true, disableTouchEvent: true };
@@ -325,7 +347,7 @@ function ProjectDetails({ route }: any) {
           <SmallMutedText>Plots</SmallMutedText>
         </Card>
         <Card style={{ alignItems: 'center', flex: 1, maxWidth: '100%' }}>
-          <H1>{project?.notesCount || 0}</H1>
+          <H1>{totalNotes}</H1>
           <SmallMutedText>Notes</SmallMutedText>
         </Card>
         <TouchableOpacity onPress={() => setisCalenderVisable(true)}>
@@ -372,6 +394,7 @@ function ProjectDetails({ route }: any) {
         }}
       >
         <CustomCalendar
+          markingType="dot"
           onDayPress={day => {
             if (getMarkedDates()[day.dateString]?.disabled) return;
             handleDateSelect(day.dateString);

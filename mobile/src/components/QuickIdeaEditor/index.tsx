@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Keyboard, Linking, Pressable, ScrollView, Switch, TouchableWithoutFeedback, useWindowDimensions, View } from 'react-native';
+import { Alert, Keyboard, Linking, Pressable, ScrollView, Switch, TouchableWithoutFeedback, View } from 'react-native';
 import { Check, ChevronDown, Clock, X } from 'lucide-react-native';
 import MyModal from '../modal';
 import CustomCalendar from '../Calender';
@@ -13,7 +13,6 @@ import { usePlotsStore } from '../../store/Projects/plots.store';
 import { addQuickNoteService, updateQuickNotes } from '../../services/quickNotes';
 import { canScheduleReminder, cancelIdeaReminders, isPastReminderDate, pickIdeaReminderTime, requestReminderPermission, scheduleIdeaReminders } from '../../services/ideaReminders';
 import { getAllProjectsService, getProjectDetailsService } from '../../services/Projects/Project';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validateMaxLength, validateRequiredMaxLength } from '../../utils/apiValidation';
 
 type Props = { visible: boolean; userId: string; initialDate: string; note?: QuickNote | null; onClose(): void; onSaved(note?: QuickNote): void };
@@ -41,8 +40,6 @@ const formatTime = (value: string) => {
 };
 
 export default function QuickIdeaEditor({ visible, userId, initialDate, note, onClose, onSaved }: Props) {
-  const window = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const projects = useProjectsStore(state => state.projectsData);
   const plots = usePlotsStore(state => state.plot);
   const [date, setDate] = useState(initialDate);
@@ -56,27 +53,14 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
   const [submitting, setSubmitting] = useState(false);
   const [draftError, setDraftError] = useState('');
   const [openSelector, setOpenSelector] = useState<'project' | 'plot' | null>(null);
-  const usableHeight = window.height - insets.top - insets.bottom;
-  const [modalMaxHeight, setModalMaxHeight] = useState(usableHeight * 0.75);
   const reminderAllowed = canScheduleReminder(date, time);
 
   useEffect(() => {
     if (!visible) return;
     Keyboard.dismiss();
-    setModalMaxHeight(usableHeight * 0.75);
     setDate(note?.date || initialDate); setDraft(note?.idea || ''); setDraftError(''); setEnabled(note?.reminderEnabled ?? false);
     setTime(note?.reminderTime || ''); setProjectId(note?.projectId || null); setPlotId(note?.plotId || null); setOpenSelector(null);
-  }, [visible, note, initialDate, usableHeight]);
-
-  useEffect(() => {
-    if (!visible) return;
-    const shown = Keyboard.addListener('keyboardDidShow', event => {
-      const heightAboveKeyboard = event.endCoordinates.screenY - insets.top - 12;
-      setModalMaxHeight(Math.max(240, heightAboveKeyboard));
-    });
-    const hidden = Keyboard.addListener('keyboardDidHide', () => setModalMaxHeight(usableHeight * 0.75));
-    return () => { shown.remove(); hidden.remove(); };
-  }, [insets.top, usableHeight, visible]);
+  }, [visible, note, initialDate]);
 
   useEffect(() => {
     if (!visible || !projectId) { setProjectPlots([]); return; }
@@ -167,7 +151,7 @@ export default function QuickIdeaEditor({ visible, userId, initialDate, note, on
     onClose();
   };
 
-  return <MyModal visible={visible} onClose={dismiss} placement="bottom" keyboardAware contentStyle={{ maxHeight: modalMaxHeight }}>
+  return <MyModal visible={visible} onClose={dismiss} placement="bottom" keyboardAware contentStyle={{ maxHeight: '75%' }}>
     <View style={{ flexShrink: 1, gap: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><H3>Quick Idea</H3><TouchableWithoutFeedback onPress={dismiss}><X size={16} color={Theme.colors.mutedForeground} /></TouchableWithoutFeedback></View>
       <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator contentContainerStyle={{ gap: 16, paddingBottom: 4 }}>

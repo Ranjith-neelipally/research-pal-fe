@@ -1,4 +1,5 @@
 import { ProjectLayoutPayload } from '../../../screens/Root/Projects/AddNewProject/Structure/helpers';
+import { toLocalDateString } from '../../../utils/common';
 import api from '../../api';
 import { normalizeApiError } from '../../apiError';
 
@@ -87,6 +88,7 @@ export const addPlotNoteService = async (
     content,
     userId,
     photoIds,
+    date: toLocalDateString(new Date()),
   };
   try {
     const res = await api.post('/projects/note', payload);

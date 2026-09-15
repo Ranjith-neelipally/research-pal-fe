@@ -9,6 +9,8 @@ import {
   ViewStyle,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  useWindowDimensions,
 } from 'react-native';
 import {
   BottomPlacementStyles,
@@ -19,6 +21,8 @@ import {
 import { BlurView } from '@react-native-community/blur';
 import { X } from 'lucide-react-native/icons';
 import { Theme } from '../theme';
+import { useKeyboardInsets } from '../../hooks/useKeyboardInsets';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 export interface MyModalProps {
   visible: boolean;
@@ -39,6 +43,25 @@ const MyModal = ({
   contentStyle,
   keyboardAware = false,
 }: MyModalProps) => {
+  const { height: screenHeight } = useWindowDimensions();
+  const insets = React.useContext(SafeAreaInsetsContext) ?? {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+  const { keyboardInset, keyboardVisible } = useKeyboardInsets();
+  const topSafeBoundary = insets.top + 12;
+  const maxKeyboardAwareHeight = Math.max(120, screenHeight - keyboardInset - topSafeBoundary);
+
+  const closeOrDismissKeyboard = () => {
+    if (keyboardAware && keyboardVisible) {
+      Keyboard.dismiss();
+      return;
+    }
+    onClose();
+  };
+
   const renderHeader = () => {
     if (modalHeader) {
       return (
@@ -51,7 +74,7 @@ const MyModal = ({
           }}
         >
           <ModalHeader>{modalHeader}</ModalHeader>
-          <TouchableWithoutFeedback onPress={onClose}>
+          <TouchableWithoutFeedback onPress={closeOrDismissKeyboard}>
             <X size={20} color={Theme.colors.mutedForeground} />
           </TouchableWithoutFeedback>
         </View>
@@ -66,14 +89,14 @@ const MyModal = ({
         visible={visible}
         transparent
         animationType="fade"
-        onRequestClose={onClose}
+        onRequestClose={closeOrDismissKeyboard}
         statusBarTranslucent
       >
         <OverlayStyles>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close modal"
-            onPress={onClose}
+            onPress={closeOrDismissKeyboard}
             style={StyleSheet.absoluteFill}
           >
             <BlurView
@@ -89,11 +112,40 @@ const MyModal = ({
               pointerEvents="box-none"
               style={StyleSheet.absoluteFill}
             >
-              <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-                <BottomPlacementStyles style={contentStyle}>
-                  {modalHeader && renderHeader()}
-                  {children}
-                </BottomPlacementStyles>
+              <View
+                pointerEvents="box-none"
+                style={[
+                  StyleSheet.absoluteFill,
+                  { paddingTop: topSafeBoundary },
+                  placement !== 'bottom' && styles.centeredContent,
+                ]}
+              >
+                {placement === 'bottom' ? (
+                  <BottomPlacementStyles
+                    style={[
+                      contentStyle,
+                      {
+                        bottom: keyboardInset,
+                        ...(keyboardVisible ? { maxHeight: maxKeyboardAwareHeight } : {}),
+                      },
+                    ]}
+                  >
+                    {modalHeader && renderHeader()}
+                    {children}
+                  </BottomPlacementStyles>
+                ) : (
+                  <ModalContent
+                    style={[
+                      contentStyle,
+                      keyboardVisible ? { maxHeight: maxKeyboardAwareHeight } : undefined,
+                    ]}
+                  >
+                    <View style={{ justifyContent: 'space-between' }}>
+                      {modalHeader && renderHeader()}
+                    </View>
+                    {children}
+                  </ModalContent>
+                )}
               </View>
             </KeyboardAvoidingView> : <View
               pointerEvents="box-none"
