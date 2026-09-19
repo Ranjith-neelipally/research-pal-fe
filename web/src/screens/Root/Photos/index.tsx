@@ -114,6 +114,13 @@ export default function PhotosPage() {
     if (sortBy === "date") return new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime();
     return (thumbs[photoStateKey(b)]?.totalBytes || 0) - (thumbs[photoStateKey(a)]?.totalBytes || 0);
   }), [photos, sortBy, thumbs]);
+  const visiblePhotos = sortedPhotos.filter(photo => photo.deviceAvailable || thumbs[photoStateKey(photo)]?.url);
+  const phoneNeedsAttention = photos.length > 0 && visiblePhotos.length === 0;
+  const retryPhotoAccess = () => {
+    resetPhotoAccessDecisions();
+    requestedThumbs.current.clear();
+    void photoLibrary.refetch();
+  };
 
   return (
     <div className="px-4 py-6 space-y-6">
@@ -131,27 +138,26 @@ export default function PhotosPage() {
         <EmptyState icon={PhoneOff} title="Unable to load photos" description={loadError} />
       ) : photos.length === 0 ? (
         <EmptyState icon={ImageIcon} title="No photos yet" description="Photos from plot notes will appear here." />
+      ) : phoneNeedsAttention ? (
+        <EmptyState
+          icon={PhoneOff}
+          title="Your photos are waiting on your phone"
+          description="Open ResearchPal on the phone that captured these photos, then enable Web Photo Access. We’ll reconnect when it’s ready."
+          action={{ label: "Try again", onClick: retryPhotoAccess }}
+        />
       ) : (
         <>
-          {photos.some(photo => !photo.deviceAvailable) && (
-            <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">
-              <div className="font-medium text-foreground">Open ResearchPal on your phone</div>
-              <p className="mt-1">Your photos are stored on your phone. Open ResearchPal and approve web photo access to continue.</p>
-              <button onClick={() => { resetPhotoAccessDecisions(); requestedThumbs.current.clear(); void photoLibrary.refetch(); }} className="mt-3 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground">Try again</button>
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {sortedPhotos.map(photo => {
+            {visiblePhotos.map(photo => {
               const thumb = thumbs[photoStateKey(photo)];
               return (
                 <button key={photoStateKey(photo)} onClick={() => setSelectedPhoto(photo)} className="relative aspect-square overflow-hidden rounded-md border bg-card text-left">
                   {thumb?.url ? <img src={thumb.url} alt="" className="h-full w-full object-cover" onLoad={() => console.log(`PHOTO PERF image-load ${JSON.stringify({ photoId: photo.photoId, variant: "thumbnail", objectUrlToImageLoadMs: thumb.objectUrlCreatedAt ? Math.round(performance.now() - thumb.objectUrlCreatedAt) : null })}`)} /> : (
                     <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-muted-foreground">
-                      {photo.deviceAvailable ? <Loader2 className="h-5 w-5 animate-spin" /> : <PhoneOff className="h-5 w-5" />}
-                      <span>{photo.deviceAvailable ? "Loading thumbnail" : "Phone offline"}</span>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Loading thumbnail</span>
                     </div>
                   )}
-                  {thumb?.error && <div className="absolute inset-x-0 bottom-0 bg-destructive/90 p-2 text-xs text-destructive-foreground">{thumb.error}</div>}
                 </button>
               );
             })}
