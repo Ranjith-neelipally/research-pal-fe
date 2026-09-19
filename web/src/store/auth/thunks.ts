@@ -1,5 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { api } from "@/services/api";
+import { clearPhotoCacheForUser } from "@/services/photoCache";
+import { clearPhotoStreamingState } from "@/services/photoStreaming";
 import type { RootState } from "@/store";
 import type { AuthResponse, AuthUser, SignupResponse } from "@/store/auth/types";
 import {
@@ -146,7 +148,8 @@ export const logout = createAsyncThunk<void, { fromAll?: boolean } | undefined, 
   "auth/logout",
   async (payload, { getState }) => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    const token = getState().auth.user?.token;
+    const currentUser = getState().auth.user || readStoredUser();
+    const token = currentUser?.token;
 
     try {
       if (token) {
@@ -157,6 +160,8 @@ export const logout = createAsyncThunk<void, { fromAll?: boolean } | undefined, 
         );
       }
     } finally {
+      clearPhotoStreamingState("web-logout");
+      await clearPhotoCacheForUser(currentUser?._id || currentUser?.email || null);
       clearStoredSession();
     }
   },

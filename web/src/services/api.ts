@@ -1,9 +1,10 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://api.research-pal.com/";
-//const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:3000/" : "https://api.research-pal.com/");
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "researchpal_user";
+const DEVICE_ID_KEY = "researchpal_web_device_id";
+const TAB_ID_KEY = "researchpal_web_tab_id";
 
 type RetryRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -19,7 +20,7 @@ export function setAccessTokenUpdatedHandler(handler: (token: string) => void) {
   accessTokenUpdatedHandler = handler;
 }
 
-function getStoredAccessToken() {
+export function getStoredAccessToken() {
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
@@ -27,6 +28,24 @@ function getStoredAccessToken() {
   } catch {
     return null;
   }
+}
+
+export function getWebDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+export function getWebTabId() {
+  let id = sessionStorage.getItem(TAB_ID_KEY);
+  if (!id) {
+    id = `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem(TAB_ID_KEY, id);
+  }
+  return id;
 }
 
 function setStoredAccessToken(token: string, refreshToken: string) {
@@ -133,6 +152,9 @@ api.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.headers["X-Client-Type"] = "web";
+  config.headers["X-Device-Id"] = getWebDeviceId();
+  config.headers["X-Device-Platform"] = "web";
 
   return config;
 });

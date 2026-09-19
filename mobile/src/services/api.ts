@@ -6,8 +6,14 @@ import { Platform } from 'react-native';
 import { cancelAllIdeaReminders } from './ideaReminders';
 import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
+// const DEV_API_BASE_URL = Platform.OS === 'android'
+//   ? 'http://192.168.31.231:3000/'
+//   : 'http://localhost:3000/';
+
+const DEV_API_BASE_URL =  'http://localhost:3000/';
+
 export const API_BASE_URL = __DEV__
-  ? 'http://192.168.31.231:3000/'
+  ? DEV_API_BASE_URL
   : 'https://api.research-pal.com/';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -18,7 +24,7 @@ const authDebug = (message: string, details?: Record<string, unknown>) => {
   if (__DEV__) console.log(`[auth] ${message}`, details || '');
 };
 
-const getDeviceIdentity = async () => {
+export const getDeviceIdentity = async () => {
   let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
     id = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).slice(2)}`;

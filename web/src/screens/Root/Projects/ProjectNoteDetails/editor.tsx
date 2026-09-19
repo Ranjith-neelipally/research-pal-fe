@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Save, Trash2, Calendar } from "lucide-react";
+import { Save, Trash2, Calendar, Image as ImageIcon, Loader2, PhoneOff, X } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -10,10 +10,31 @@ import {
   updatePlotNoteService,
   type PlotNoteDto,
 } from "@/services/projects";
+import { usePhotoLibrary } from "@/hooks/usePhotoLibrary";
+import { resolvePhotoObjectUrl } from "@/services/photoCache";
+import type { PhotoMetadata } from "@/services/photoStreaming";
 import { validateRequiredMaxLength } from "@/utils/apiValidation";
 
 const noteText = (note: PlotNoteDto) => note.content?.[0]?.note?.join("\n") || "";
 const isObjectId = (value?: string) => /^[a-f\d]{24}$/i.test(value || "");
+const offlineMessage = "Photos are stored on your phone. Open ResearchPal on that device to view them.";
+
+type StreamState = {
+  url?: string;
+  objectUrlCreatedAt?: number;
+  loading: boolean;
+  error?: string;
+  transferredBytes: number;
+  totalBytes: number;
+};
+
+const formatSize = (bytes: number) => {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const photoStateKey = (photo: PhotoMetadata) => `${photo.sourceDeviceId || "no-device"}:${photo.photoId}`;
 
 const EditNotePage = () => {
   const navigate = useNavigate();
@@ -28,8 +49,22 @@ const EditNotePage = () => {
   const [isLoading, setIsLoading] = useState(!isNewNote);
   const [isSaving, setIsSaving] = useState(false);
   const [contentError, setContentError] = useState("");
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoMetadata | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, StreamState>>({});
+  const [detail, setDetail] = useState<StreamState>({ loading: false, transferredBytes: 0, totalBytes: 0 });
+  const detailCache = useRef<Record<string, StreamState>>({});
+  const requestedThumbs = useRef(new Set<string>());
+  const photoLibrary = usePhotoLibrary({ enabled: !isNewNote });
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
   const isOverLimit = wordCount > 5000;
+  const hasInvalidExistingPlotId = !isNewNote && Boolean(plotId) && !isObjectId(plotId);
+  const showNoteLoading = isLoading && !hasInvalidExistingPlotId;
+  const notePhotos = useMemo(
+    () => (photoLibrary.data?.photos || []).filter((photo) =>
+      photo.projectId === projectId && photo.plotId === plotId && photo.noteId === noteId
+    ),
+    [noteId, photoLibrary.data?.photos, plotId, projectId],
+  );
 
   useEffect(() => {
     if (isNewNote || !projectId || !plotId || !noteId) return;
@@ -39,11 +74,9 @@ const EditNotePage = () => {
         description: "Plot link is invalid. Open notes from the project plot grid.",
         variant: "destructive",
       });
-      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     getPlotNotesService({ projectId, plotId, limit: 100 })
       .then((notes) => {
         const note = notes.find((item) => item._id === noteId);
@@ -63,6 +96,130 @@ const EditNotePage = () => {
       })
       .finally(() => setIsLoading(false));
   }, [isNewNote, noteId, plotId, projectId, toast]);
+
+  useEffect(() => {
+    const availablePhotoIds = new Set(notePhotos.map(photoStateKey));
+    requestedThumbs.current.forEach((key) => {
+      if (!availablePhotoIds.has(key)) requestedThumbs.current.delete(key);
+    });
+    setThumbs((state) => {
+      const next = Object.fromEntries(Object.entries(state).filter(([key]) => availablePhotoIds.has(key)));
+      return Object.keys(next).length === Object.keys(state).length ? state : next;
+    });
+  }, [notePhotos]);
+
+  useEffect(() => {
+    if (isNewNote || !notePhotos.length) return;
+    const controller = new AbortController();
+    const effectRequestedPhotoIds = new Set<string>();
+
+    void (async () => {
+      for (const photo of notePhotos) {
+        const key = photoStateKey(photo);
+        if (controller.signal.aborted) return;
+        if (requestedThumbs.current.has(key)) continue;
+
+        requestedThumbs.current.add(key);
+        effectRequestedPhotoIds.add(key);
+
+        setThumbs((state) => ({
+          ...state,
+          [key]: { loading: true, transferredBytes: 0, totalBytes: 0 },
+        }));
+
+        try {
+          const result = await resolvePhotoObjectUrl(photo, "thumbnail", (progress) => {
+            if (controller.signal.aborted) return;
+            setThumbs((state) => ({
+              ...state,
+              [key]: {
+                ...(state[key] || { loading: true }),
+                loading: true,
+                transferredBytes: progress.transferredBytes,
+                totalBytes: progress.totalBytes,
+              },
+            }));
+          }, controller.signal);
+          if (controller.signal.aborted) {
+            requestedThumbs.current.delete(key);
+            return;
+          }
+          console.log(`PHOTO PERF note-thumbnail-ready ${JSON.stringify({ photoId: photo.photoId, blobBytes: result.blob.size, cacheHit: result.cacheHit })}`);
+          setThumbs((state) => ({
+            ...state,
+            [key]: { loading: false, url: result.url, objectUrlCreatedAt: result.objectUrlCreatedAt, transferredBytes: result.blob.size, totalBytes: result.blob.size },
+          }));
+        } catch (error) {
+          requestedThumbs.current.delete(key);
+          if (controller.signal.aborted) {
+            setThumbs((state) => {
+              const current = state[key];
+              if (!current?.loading || current.url) return state;
+              return {
+                ...state,
+                [key]: { loading: false, transferredBytes: current.transferredBytes || 0, totalBytes: current.totalBytes || 0 },
+              };
+            });
+            return;
+          }
+          setThumbs((state) => ({
+            ...state,
+            [key]: {
+              loading: false,
+              error: error instanceof Error ? error.message : String(error),
+              transferredBytes: 0,
+              totalBytes: 0,
+            },
+          }));
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      effectRequestedPhotoIds.forEach((photoId) => {
+        const current = thumbs[photoId];
+        if (!current?.url) requestedThumbs.current.delete(photoId);
+      });
+    };
+  }, [isNewNote, notePhotos]);
+
+  useEffect(() => {
+    if (!selectedPhoto) return;
+    const key = photoStateKey(selectedPhoto);
+    const cachedDetail = detailCache.current[key];
+    if (cachedDetail?.url) {
+      setDetail(cachedDetail);
+      return;
+    }
+
+    const controller = new AbortController();
+    setDetail({ loading: true, transferredBytes: 0, totalBytes: 0 });
+
+    void resolvePhotoObjectUrl(selectedPhoto, "original", (progress) => {
+      setDetail((state) => ({
+        ...state,
+        loading: true,
+        transferredBytes: progress.transferredBytes,
+        totalBytes: progress.totalBytes,
+      }));
+    }, controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      const nextDetail = { loading: false, url: result.url, objectUrlCreatedAt: result.objectUrlCreatedAt, transferredBytes: result.blob.size, totalBytes: result.blob.size };
+      detailCache.current[key] = nextDetail;
+      setDetail(nextDetail);
+    }).catch((error) => {
+      if (controller.signal.aborted) return;
+      setDetail({
+        loading: false,
+        error: error instanceof Error ? error.message : String(error),
+        transferredBytes: 0,
+        totalBytes: 0,
+      });
+    });
+
+    return () => controller.abort();
+  }, [selectedPhoto]);
 
   const handleGoBack = () => {
     if (returnTo === "list") {
@@ -153,7 +310,7 @@ const EditNotePage = () => {
             )}
             <button
               onClick={handleSave}
-              disabled={isSaving || isLoading || isOverLimit || !content.trim()}
+              disabled={isSaving || showNoteLoading || isOverLimit || !content.trim()}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
             >
               <Save size={16} />
@@ -163,7 +320,7 @@ const EditNotePage = () => {
         </section>
 
         <section className="glass-card p-4 space-y-4">
-          {isLoading ? (
+          {showNoteLoading ? (
             <div className="text-sm text-muted-foreground">Loading note...</div>
           ) : (
             <textarea
@@ -185,7 +342,91 @@ const EditNotePage = () => {
           </div>
         </section>
 
-        {/* Photos are disabled in the web version for now. */}
+        {!isNewNote && (
+          <section className="glass-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={16} className="text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Photos ({notePhotos.length})</h3>
+              </div>
+              {photoLibrary.isFetching && !notePhotos.length && (
+                <Loader2 size={14} className="animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            {photoLibrary.isLoading ? (
+              <div className="rounded-xl bg-secondary/40 p-4 text-sm text-muted-foreground">Loading photo metadata...</div>
+            ) : notePhotos.length === 0 ? (
+              <div className="rounded-xl bg-secondary/40 p-4 text-sm text-muted-foreground">No photos attached to this note.</div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {notePhotos.map((photo) => {
+                  const key = photoStateKey(photo);
+                  const thumb = thumbs[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedPhoto(photo)}
+                      className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card text-left"
+                    >
+                      {thumb?.url ? (
+                        <img
+                          src={thumb.url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          onLoad={() => console.log(`PHOTO PERF image-load ${JSON.stringify({ photoId: photo.photoId, variant: "thumbnail", objectUrlToImageLoadMs: thumb.objectUrlCreatedAt ? Math.round(performance.now() - thumb.objectUrlCreatedAt) : null })}`)}
+                        />
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center gap-2 p-2 text-center text-[11px] text-muted-foreground">
+                          {photo.deviceAvailable ? <Loader2 className="h-4 w-4 animate-spin" /> : <PhoneOff className="h-4 w-4" />}
+                          <span>{photo.deviceAvailable ? "Loading" : "Phone offline"}</span>
+                        </div>
+                      )}
+                      {thumb?.error && (
+                        <div className="absolute inset-x-0 bottom-0 bg-destructive/90 p-1 text-[10px] text-destructive-foreground">
+                          {thumb.error}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {selectedPhoto && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-background">
+            <div className="flex items-center justify-between border-b p-4">
+              <button onClick={() => setSelectedPhoto(null)} className="rounded-md p-2 hover:bg-secondary">
+                <X size={22} />
+              </button>
+              <span className="text-sm text-muted-foreground">{format(new Date(selectedPhoto.capturedAt), "MMM d, yyyy")}</span>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+              {detail.url ? (
+                <img
+                  src={detail.url}
+                  alt=""
+                  className="max-h-full max-w-full rounded-md object-contain"
+                  onLoad={() => console.log(`PHOTO PERF image-load ${JSON.stringify({ photoId: selectedPhoto.photoId, variant: "original", objectUrlToImageLoadMs: detail.objectUrlCreatedAt ? Math.round(performance.now() - detail.objectUrlCreatedAt) : null })}`)}
+                />
+              ) : (
+                <div className="max-w-sm text-center text-sm text-muted-foreground">
+                  {detail.loading ? <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" /> : <PhoneOff className="mx-auto mb-3 h-6 w-6" />}
+                  <p>{detail.error || (selectedPhoto.deviceAvailable ? "Streaming encrypted photo from your phone..." : offlineMessage)}</p>
+                  {detail.totalBytes > 0 && <p className="mt-2">{formatSize(detail.transferredBytes)} / {formatSize(detail.totalBytes)}</p>}
+                </div>
+              )}
+            </div>
+            <div className="border-t bg-card p-4 text-sm">
+              <div className="font-medium">{selectedPhoto.projectTitle || "Research photo"}</div>
+              <div className="mt-1 text-muted-foreground">{selectedPhoto.plotTitle || selectedPhoto.plotId}</div>
+              {selectedPhoto.notePreview && <p className="mt-3 leading-relaxed">{selectedPhoto.notePreview}</p>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

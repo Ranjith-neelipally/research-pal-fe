@@ -24,6 +24,7 @@ import {
   Pencil,
   Trash2,
   ShieldCheck,
+  Images,
 } from 'lucide-react-native';
 import { Card } from '../../../components/Card/styles';
 import {
@@ -38,10 +39,13 @@ import { getAttachedPhotoStorageStats } from '../../../localStorage';
 import { logoutService } from '../../../services/login';
 import {
   AUTO_WEATHER_KEY,
+  type WebPhotoAccessPreference,
   changePassword,
+  getWebPhotoAccessPreference,
   getProfile,
   getSessions,
   revokeSession,
+  setWebPhotoAccessPreference,
   updateProfile,
 } from '../../../services/settings';
 import { getAllProjectsService } from '../../../services/Projects/Project';
@@ -49,7 +53,7 @@ import { useProjectsStore } from '../../../store/Projects/Projects.store';
 import { clearUserLocalData, confirmAccountDeletion, requestAccountDeletion } from '../../../services/accountDeletion';
 import { validateChangePassword } from '../../../utils/authValidation';
 
-type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | null;
+type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | 'webPhotoAccess' | null;
 type Session = {
   id: string;
   title: string;
@@ -71,6 +75,11 @@ const bytes = (value: number) => {
 
 const PRIVACY_URL = 'https://research-pal.com/privacy';
 const ACCOUNT_DELETION_URL = 'https://research-pal.com/account-deletion';
+const webPhotoAccessLabels: Record<WebPhotoAccessPreference, string> = {
+  ask: 'Ask every time',
+  allow: 'Always allow',
+  reject: 'Always reject',
+};
 
 const openPublicPage = async (url: string) => {
   try {
@@ -108,6 +117,7 @@ export default function SettingsScreen() {
     allowance: number | null;
   }>({ projects: 0, photos: 0, used: 0, allowance: null });
   const [autoWeather, setAutoWeather] = useState(true);
+  const [webPhotoAccess, setWebPhotoAccess] = useState<WebPhotoAccessPreference>('ask');
   const [sheet, setSheet] = useState<Sheet>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -142,13 +152,14 @@ export default function SettingsScreen() {
   };
 
   const load = useCallback(async () => {
-    const [, remoteProfile, weatherValue, photoStats] = await Promise.all([
+    const [, remoteProfile, weatherValue, photoStats, photoAccessValue] = await Promise.all([
       authUser?._id
         ? getAllProjectsService(authUser._id)
         : Promise.resolve(null),
       getProfile().catch(() => null),
       AsyncStorage.getItem(AUTO_WEATHER_KEY),
       getAttachedPhotoStorageStats(),
+      getWebPhotoAccessPreference(),
     ]);
     if (remoteProfile) {
       setProfile({
@@ -160,6 +171,7 @@ export default function SettingsScreen() {
       setProfession(remoteProfile.profession || '');
     }
     setAutoWeather(weatherValue !== 'false');
+    setWebPhotoAccess(photoAccessValue);
     setFootprint({
       projects: useProjectsStore.getState().projectsData.length,
       photos: photoStats.photoCount,
@@ -182,6 +194,12 @@ export default function SettingsScreen() {
   const toggleWeather = async (enabled: boolean) => {
     setAutoWeather(enabled);
     await AsyncStorage.setItem(AUTO_WEATHER_KEY, String(enabled));
+  };
+
+  const chooseWebPhotoAccess = async (value: WebPhotoAccessPreference) => {
+    setWebPhotoAccess(value);
+    await setWebPhotoAccessPreference(value);
+    setSheet(null);
   };
 
   const openSessions = async () => {
@@ -360,7 +378,13 @@ export default function SettingsScreen() {
         </Card>
 
         <Card style={styles.card}>
-          <H3>Privacy</H3>
+          <H3>Privacy & Security</H3>
+          <SettingRow
+            icon={<Images size={19} color={Theme.colors.mutedForeground} />}
+            title="Web photo access"
+            detail={webPhotoAccessLabels[webPhotoAccess]}
+            onPress={() => setSheet('webPhotoAccess')}
+          />
           <SettingRow
             icon={<ShieldCheck size={19} color={Theme.colors.mutedForeground} />}
             title="Privacy Policy"
@@ -525,6 +549,28 @@ export default function SettingsScreen() {
                   </View>
                 ))
               )}
+                </>
+              )}
+              {sheet === 'webPhotoAccess' && (
+                <>
+              <H3>Web photo access</H3>
+              {(['ask', 'allow', 'reject'] as WebPhotoAccessPreference[]).map(value => (
+                <Pressable
+                  key={value}
+                  style={styles.sheetAction}
+                  onPress={() => chooseWebPhotoAccess(value)}
+                >
+                  <TextSecondary style={webPhotoAccess === value && styles.green}>
+                    {webPhotoAccessLabels[value]}
+                  </TextSecondary>
+                </Pressable>
+              ))}
+              <Pressable
+                style={styles.sheetAction}
+                onPress={() => setSheet(null)}
+              >
+                <MutedText>Cancel</MutedText>
+              </Pressable>
                 </>
               )}
               {sheet === 'signout' && (

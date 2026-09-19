@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  BackHandler,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -23,20 +22,32 @@ import { useKeyboardInsets } from '../../../hooks/useKeyboardInsets';
 
 const ForgetPassword = () => {
   const navigation = useNavigation<NavigationProp<any>>();
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const { keyboardInset, keyboardVisible } = useKeyboardInsets();
 
-  useEffect(() => {
-    if (!keyboardVisible || Platform.OS !== 'android') return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      Keyboard.dismiss();
-      return true;
+  const keepFormVisible = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
     });
-    return () => subscription.remove();
-  }, [keyboardVisible]);
+  };
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(keepFormVisible, 80);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const goToLogin = () => {
     navigation.navigate('Login' as never);
@@ -66,11 +77,12 @@ const ForgetPassword = () => {
     <LoginScreen>
       <KeyboardAvoidingView
         style={{ flex: 1, width: '100%' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={{
               flexGrow: 1,
               justifyContent: 'center',
@@ -79,6 +91,7 @@ const ForgetPassword = () => {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
             <View style={{ width: '85%', alignSelf: 'center' }}>
               <LogoAndTitle>
@@ -103,6 +116,7 @@ const ForgetPassword = () => {
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!isLoading}
+                  onFocus={keepFormVisible}
                   onChangeText={text => {
                     setEmail(text);
                     if (emailError) setEmailError(undefined);

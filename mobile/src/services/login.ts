@@ -2,6 +2,7 @@ import api, { refreshAccessToken, SESSION_ID_KEY } from './api';
 import { useAuthStore } from '../store/auth.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cancelAllIdeaReminders } from './ideaReminders';
+import { stopMobilePhotoStreaming } from './photoStreaming';
 import { clearSecureCredentials, getSecureCredentials, setSecureCredentials } from './secureCredentials';
 
 interface userinformation {
@@ -158,6 +159,7 @@ export async function refreshSession() {
 
 export async function logoutService(fromAll = false) {
   const refreshToken = (await getSecureCredentials())?.refreshToken;
+  stopMobilePhotoStreaming('mobile-logout');
 
   // Reminders are device-local and must not survive either logout path.
   await cancelAllIdeaReminders();

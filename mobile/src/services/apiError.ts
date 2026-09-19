@@ -67,6 +67,7 @@ export const normalizeApiError = (error: unknown): NormalizedApiError => {
 
   const message =
     apiError?.message ||
+    firstMessage(responseData?.error) ||
     responseData?.message ||
     firstMessage(responseData?.errors) ||
     messageByCode[code] ||

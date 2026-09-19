@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, FolderKanban, Lightbulb, User } from "lucide-react";
+import { Home, FolderKanban, Images, Lightbulb, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -7,8 +7,7 @@ const tabs = [
   { to: "/home", label: "Home", icon: Home },
   { to: "/projects", label: "Projects", icon: FolderKanban },
   { to: "/diary", label: "Ideas", icon: Lightbulb },
-  // Web photos page is intentionally hidden; keep PhotosPage code available for later.
-  // { to: "/photos", label: "Photos", icon: Images },
+  { to: "/photos", label: "Photos", icon: Images },
   { to: "/profile", label: "Profile", icon: User },
 ] as const;
 
@@ -26,7 +25,7 @@ const routeHeaders = [
   { match: /^\/projects\/[^/]+\/?$/, title: "Project Details", subtitle: "Plots, treatments, and observations" },
   { match: /^\/projects\/?$/, title: "Projects", subtitle: "Manage your research experiments" },
   { match: /^\/diary\/?$/, title: "Diary", subtitle: "Daily research journal" },
-  // { match: /^\/photos\/?$/, title: "Photos", subtitle: "Images across all research" },
+  { match: /^\/photos\/?$/, title: "Photos", subtitle: "Images across all research" },
   { match: /^\/profile\/?$/, title: "Profile", subtitle: "Your identity, research footprint, and preferences." },
 ] as const;
 

@@ -25,7 +25,7 @@ import ProjectNotesListPage from "./screens/Root/Projects/ProjectNotesList";
 import PlotNotesPage from "./screens/Root/Projects/PlotNotes";
 import EditNotePage from "./screens/Root/Projects/ProjectNoteDetails/editor";
 import DiaryPage from "./screens/Root/Diary";
-// import PhotosPage from "./screens/Root/Photos";
+import PhotosPage from "./screens/Root/Photos";
 import ProfilePage from "./screens/Root/Profile";
 import NotFound from "./screens/Public/NotFound";
 // import SplashPage from "./screens/Public/Splash";
@@ -60,6 +60,7 @@ const getRouteTitle = (pathname: string) => {
   if (/^\/projects\/[^/]+\/plot\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Plot Notes";
   if (/^\/projects\/[^/]+\/?$/.test(pathname)) return "ResearchPal | Project Details";
   if (pathname === "/diary") return "ResearchPal | Diary";
+  if (pathname === "/photos") return "ResearchPal | Photos";
   if (pathname === "/profile") return "ResearchPal | Profile";
   return "ResearchPal | Not Found";
 };
@@ -123,8 +124,7 @@ const App = () => (
                 <Route path="/projects/:projectId/plot/:plotId" element={<ProtectedRoute><PlotNotesPage /></ProtectedRoute>} />
                 <Route path="/projects/:projectId/plot/:plotId/note/:noteId" element={<ProtectedRoute><EditNotePage /></ProtectedRoute>} />
                 <Route path="/diary" element={<ProtectedRoute><DiaryPage /></ProtectedRoute>} />
-                {/* Web photos page is intentionally disabled; keep PhotosPage code available for later. */}
-                {/* <Route path="/photos" element={<PhotosPage />} /> */}
+                <Route path="/photos" element={<ProtectedRoute><PhotosPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

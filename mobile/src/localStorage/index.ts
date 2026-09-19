@@ -13,6 +13,22 @@ export interface StoredPhoto {
 }
 
 const APP_PHOTO_DIR = `${RNFS.DocumentDirectoryPath}/photos`;
+const photoInventoryListeners = new Set<() => void | Promise<void>>();
+
+export const subscribeLocalPhotoInventoryChanges = (listener: () => void | Promise<void>) => {
+  photoInventoryListeners.add(listener);
+  return () => {
+    photoInventoryListeners.delete(listener);
+  };
+};
+
+const notifyLocalPhotoInventoryChanged = () => {
+  photoInventoryListeners.forEach(listener => {
+    void Promise.resolve(listener()).catch(error => {
+      if (__DEV__) console.error('Unable to publish photo inventory change', error);
+    });
+  });
+};
 
 export const getAttachedPhotoStorageStats = async () => {
   const directoryExists = await RNFS.exists(APP_PHOTO_DIR);
@@ -148,6 +164,18 @@ export const cleanupProjectLocalData = async (
   );
 };
 
+export const getPhotoByIdForStreaming = getPhotoById;
+
+export const getAvailablePhotoIdsForStreaming = async (): Promise<string[]> => {
+  const directoryExists = await RNFS.exists(APP_PHOTO_DIR);
+  if (!directoryExists) return [];
+
+  const entries = await RNFS.readDir(APP_PHOTO_DIR);
+  return entries
+    .filter(entry => entry.isFile() && entry.name.endsWith('.jpg'))
+    .map(entry => entry.name.replace(/\.jpg$/, ''));
+};
+
 const settingsAlert = (title: string, message: string) => {
   Alert.alert(title, message, [
     { text: 'Not now', style: 'cancel' },
@@ -220,6 +248,8 @@ export const usePhotoStorage = () => {
       }
     }
 
+    if (photos.length) notifyLocalPhotoInventoryChanged();
+
     return photos;
   }, [showPickerError]);
 
@@ -241,6 +271,8 @@ export const usePhotoStorage = () => {
         photos.push(await copyPhotoToAppStorage(asset.uri));
       }
     }
+
+    if (photos.length) notifyLocalPhotoInventoryChanged();
 
     return photos;
   }, [showPickerError]);
