@@ -85,7 +85,6 @@ export async function uploadPhoto(
   if (variants.standard) form.append("standard", variants.standard, "standard.jpg");
   if (variants.thumbnail) form.append("thumbnail", variants.thumbnail, "thumbnail.jpg");
   const response = await api.post<{ photo: PhotoMetadata }>("/photos/upload", form, {
-    headers: { "Content-Type": "multipart/form-data" },
     timeout: 120000,
   });
   return response.data.photo;

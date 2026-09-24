@@ -91,7 +91,6 @@ export const uploadPhoto = async (
     if (standardSource) form.append('standard', { uri: standardSource.uri, name: `${photo.id}-standard.jpg`, type: 'image/jpeg' } as any);
     form.append('thumbnail', { uri: thumbnailSource.uri, name: `${photo.id}-thumbnail.jpg`, type: 'image/jpeg' } as any);
     const response = await api.post('/photos/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 120000,
       onUploadProgress: progress => {
         if (progress.total) onProgress?.(Math.round((progress.loaded / progress.total) * 100));

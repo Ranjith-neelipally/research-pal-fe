@@ -152,6 +152,9 @@ api.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
   config.headers["X-Client-Type"] = "web";
   config.headers["X-Device-Id"] = getWebDeviceId();
   config.headers["X-Device-Platform"] = "web";
