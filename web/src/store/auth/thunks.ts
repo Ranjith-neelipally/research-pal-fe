@@ -1,7 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { api } from "@/services/api";
-import { clearPhotoCacheForUser } from "@/services/photoCache";
-import { clearPhotoStreamingState } from "@/services/photoStreaming";
+import { clearResearchPalPhotoCache } from "@/services/photoImageCache";
 import type { RootState } from "@/store";
 import type { AuthResponse, AuthUser, SignupResponse } from "@/store/auth/types";
 import {
@@ -160,8 +159,7 @@ export const logout = createAsyncThunk<void, { fromAll?: boolean } | undefined, 
         );
       }
     } finally {
-      clearPhotoStreamingState("web-logout");
-      await clearPhotoCacheForUser(currentUser?._id || currentUser?.email || null);
+      await clearResearchPalPhotoCache().catch(() => undefined);
       clearStoredSession();
     }
   },

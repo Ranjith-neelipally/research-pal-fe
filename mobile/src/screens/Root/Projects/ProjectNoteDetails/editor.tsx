@@ -33,6 +33,20 @@ import {
 import { validateRequiredMaxLength } from '../../../../utils/apiValidation';
 import { useNoteEventsStore } from '../../../../store/noteEvents.store';
 import { toLocalDateString } from '../../../../utils/common';
+import { getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../../services/Photos/index';
+import { enqueuePhotoUploads, processPhotoUploadQueue } from '../../../../services/photoUploadQueue';
+
+const photoUri = (photo: StoredPhoto) => photo.remoteUrl || `file://${photo.location}`;
+
+const isSuccessResponse = (response: { status: number }) =>
+  response.status >= 200 && response.status < 300;
+
+const responseErrorMessage = (response: { message?: string; status: number }) =>
+  'message' in response && response.message
+    ? response.message
+    : 'Unable to save this note. Please try again.';
+
+const isUploadedPhoto = (photo: StoredPhoto) => Boolean(photo.remoteUrl || photo.cloudPhoto);
 
 const PlotNoteEditorScreen = ({ route }: any) => {
   const navigation = useNavigation<any>();
@@ -67,8 +81,23 @@ const PlotNoteEditorScreen = ({ route }: any) => {
         return;
       }
 
-      const stored = await getPhotosByIds(photoIds);
-      setPhotos(stored);
+      const [stored, cloud] = await Promise.all([
+        getPhotosByIds(photoIds),
+        getPhotoLibrary().catch(() => []),
+      ]);
+      await syncMissingCloudPhotos(cloud.filter(photo => photoIds.includes(photo.photoId)));
+      const localIds = new Set(stored.map(photo => photo.id));
+      const remote = await Promise.all(cloud
+        .filter(photo => photoIds.includes(photo.photoId) && !localIds.has(photo.photoId))
+        .map(async photo => ({
+          id: photo.photoId,
+          name: `${photo.photoId}.jpg`,
+          location: await resolveCloudPhotoFile(photo, 'thumbnail'),
+          mimeType: photo.variants.thumbnail.mimeType,
+          date: photo.capturedAt,
+          cloudPhoto: photo,
+        })));
+      setPhotos([...stored, ...remote]);
     };
 
     loadInitialPhotos();
@@ -112,7 +141,6 @@ const PlotNoteEditorScreen = ({ route }: any) => {
 
     try {
       const content = formatContentForSave(noteContent);
-      const photoIds = photos.map(photo => photo.id);
 
       const contentErrorMessage = validateRequiredMaxLength(
         content.join('\n'),
@@ -124,18 +152,33 @@ const PlotNoteEditorScreen = ({ route }: any) => {
         return;
       }
 
+      const uploadedPhotoIds = photos
+        .filter(isUploadedPhoto)
+        .map(photo => photo.id);
+      const localPhotos = photos.filter(photo => !isUploadedPhoto(photo));
+      let savedNoteId = selectedPlotNote?._id;
+
       if (selectedPlotNote?._id) {
-        await updatePlotNoteService(
+        const response = await updatePlotNoteService(
           projectId,
           plotId,
           content,
           userId,
           selectedPlotNote._id,
-          photoIds,
+          uploadedPhotoIds,
         );
+        if (!isSuccessResponse(response)) {
+          throw new Error(responseErrorMessage(response));
+        }
       } else {
-        const response = await addPlotNoteService(projectId, plotId, content, userId, photoIds);
-        if (response.status >= 200 && response.status < 300 && 'data' in response) {
+        const response = await addPlotNoteService(projectId, plotId, content, userId, uploadedPhotoIds);
+        if (!isSuccessResponse(response)) {
+          throw new Error(responseErrorMessage(response));
+        }
+        savedNoteId = 'data' in response
+          ? response.data?._id || response.data?.id
+          : undefined;
+        if ('data' in response) {
           notifyNoteCreated({
             projectId,
             plotId,
@@ -143,8 +186,25 @@ const PlotNoteEditorScreen = ({ route }: any) => {
           });
         }
       }
+      if (localPhotos.length && !savedNoteId) {
+        throw new Error('Unable to attach photos before the note is saved.');
+      }
+      await enqueuePhotoUploads(localPhotos.map(photo => ({
+        photo,
+        projectId,
+        plotId,
+        noteId: savedNoteId,
+        capturedAt: photo.date,
+      })));
+      await processPhotoUploadQueue({
+        overrideRestrictions: true,
+        photoIds: localPhotos.map(photo => photo.id),
+        throwOnFailure: true,
+      });
 
       navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message || 'Unable to save this note. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -357,7 +417,11 @@ const PlotNoteEditorScreen = ({ route }: any) => {
               contentContainerStyle={{ paddingRight: 16 }}
               ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
               renderItem={({ item: photo }) => (
-                <Pressable onPress={() => setPreviewPhoto(photo)}>
+                <Pressable onPress={async () => {
+                  const cloudPhoto = photo.cloudPhoto;
+                  const standardLocation = cloudPhoto ? await resolveCloudPhotoFile(cloudPhoto as any, 'standard') : photo.location;
+                  setPreviewPhoto({ ...photo, standardLocation });
+                }}>
                   <TouchableOpacity
                     onPress={() => handleRemovePhoto(photo.id)}
                     style={{
@@ -377,7 +441,7 @@ const PlotNoteEditorScreen = ({ route }: any) => {
                   </TouchableOpacity>
 
                   <Image
-                    source={{ uri: `file://${photo.location}` }}
+                    source={{ uri: photoUri(photo) }}
                     style={{ width: 160, height: 160, borderRadius: 20 }}
                   />
                 </Pressable>
@@ -415,7 +479,7 @@ const PlotNoteEditorScreen = ({ route }: any) => {
           {previewPhoto && (
             <>
               <Image
-                source={{ uri: `file://${previewPhoto.location}` }}
+                source={{ uri: previewPhoto.standardLocation ? `file://${previewPhoto.standardLocation}` : photoUri(previewPhoto) }}
                 style={{ width: '90%', height: '70%', borderRadius: 12 }}
                 resizeMode="contain"
               />

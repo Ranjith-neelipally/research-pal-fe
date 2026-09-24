@@ -62,7 +62,7 @@ const Photos = ({ photos, onAddPress, onRemovePhoto }: PhotosProps) => {
               </TouchableOpacity>
             )}
             <Image
-              source={{ uri: `file://${photo.location}` }}
+              source={{ uri: photo.remoteUrl || `file://${photo.location}` }}
               style={{ width: 80, height: 80, borderRadius: 8 }}
             />
           </Pressable>
@@ -82,7 +82,7 @@ const Photos = ({ photos, onAddPress, onRemovePhoto }: PhotosProps) => {
           {previewPhoto && (
             <>
               <Image
-                source={{ uri: `file://${previewPhoto.location}` }}
+                source={{ uri: previewPhoto.remoteUrl || `file://${previewPhoto.location}` }}
                 style={{ width: '90%', height: '70%', borderRadius: 12 }}
                 resizeMode="contain"
               />

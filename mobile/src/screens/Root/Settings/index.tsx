@@ -24,7 +24,6 @@ import {
   Pencil,
   Trash2,
   ShieldCheck,
-  Images,
 } from 'lucide-react-native';
 import { Card } from '../../../components/Card/styles';
 import {
@@ -37,15 +36,16 @@ import { Theme } from '../../../components/theme';
 import { useAuthStore } from '../../../store/auth.store';
 import { getAttachedPhotoStorageStats } from '../../../localStorage';
 import { logoutService } from '../../../services/login';
+import { getPhotoUploadSettings, setPhotoUploadSettings, type PhotoUploadSettings } from '../../../services/photoUploadSettings';
+import { schedulePhotoUploadWork } from '../../../services/photoUploadScheduler';
+import { getPhotoLibrary, syncMissingCloudPhotos } from '../../../services/Photos';
+import { processPhotoUploadQueue } from '../../../services/photoUploadQueue';
 import {
   AUTO_WEATHER_KEY,
-  type WebPhotoAccessPreference,
   changePassword,
-  getWebPhotoAccessPreference,
   getProfile,
   getSessions,
   revokeSession,
-  setWebPhotoAccessPreference,
   updateProfile,
 } from '../../../services/settings';
 import { getAllProjectsService } from '../../../services/Projects/Project';
@@ -53,7 +53,7 @@ import { useProjectsStore } from '../../../store/Projects/Projects.store';
 import { clearUserLocalData, confirmAccountDeletion, requestAccountDeletion } from '../../../services/accountDeletion';
 import { validateChangePassword } from '../../../utils/authValidation';
 
-type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | 'webPhotoAccess' | null;
+type Sheet = 'edit' | 'password' | 'sessions' | 'signout' | 'deleteWarning' | 'deleteOtp' | null;
 type Session = {
   id: string;
   title: string;
@@ -75,12 +75,6 @@ const bytes = (value: number) => {
 
 const PRIVACY_URL = 'https://research-pal.com/privacy';
 const ACCOUNT_DELETION_URL = 'https://research-pal.com/account-deletion';
-const webPhotoAccessLabels: Record<WebPhotoAccessPreference, string> = {
-  ask: 'Ask every time',
-  allow: 'Always allow',
-  reject: 'Always reject',
-};
-
 const openPublicPage = async (url: string) => {
   try {
     await Linking.openURL(url);
@@ -117,7 +111,10 @@ export default function SettingsScreen() {
     allowance: number | null;
   }>({ projects: 0, photos: 0, used: 0, allowance: null });
   const [autoWeather, setAutoWeather] = useState(true);
-  const [webPhotoAccess, setWebPhotoAccess] = useState<WebPhotoAccessPreference>('ask');
+  const [photoUploadSettings, setLocalPhotoUploadSettings] = useState<PhotoUploadSettings>({
+    wifiOnly: true,
+    chargingOnly: true,
+  });
   const [sheet, setSheet] = useState<Sheet>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -152,14 +149,14 @@ export default function SettingsScreen() {
   };
 
   const load = useCallback(async () => {
-    const [, remoteProfile, weatherValue, photoStats, photoAccessValue] = await Promise.all([
+    const [, remoteProfile, weatherValue, photoStats, uploadSettings] = await Promise.all([
       authUser?._id
         ? getAllProjectsService(authUser._id)
         : Promise.resolve(null),
       getProfile().catch(() => null),
       AsyncStorage.getItem(AUTO_WEATHER_KEY),
       getAttachedPhotoStorageStats(),
-      getWebPhotoAccessPreference(),
+      getPhotoUploadSettings(),
     ]);
     if (remoteProfile) {
       setProfile({
@@ -171,7 +168,7 @@ export default function SettingsScreen() {
       setProfession(remoteProfile.profession || '');
     }
     setAutoWeather(weatherValue !== 'false');
-    setWebPhotoAccess(photoAccessValue);
+    setLocalPhotoUploadSettings(uploadSettings);
     setFootprint({
       projects: useProjectsStore.getState().projectsData.length,
       photos: photoStats.photoCount,
@@ -196,10 +193,26 @@ export default function SettingsScreen() {
     await AsyncStorage.setItem(AUTO_WEATHER_KEY, String(enabled));
   };
 
-  const chooseWebPhotoAccess = async (value: WebPhotoAccessPreference) => {
-    setWebPhotoAccess(value);
-    await setWebPhotoAccessPreference(value);
-    setSheet(null);
+  const updatePhotoUploadSetting = async (key: keyof PhotoUploadSettings, enabled: boolean) => {
+    const next = { ...photoUploadSettings, [key]: enabled };
+    setLocalPhotoUploadSettings(next);
+    await setPhotoUploadSettings(next);
+    await schedulePhotoUploadWork();
+  };
+
+  const syncPhotosNow = async () => {
+    setSaving(true);
+    try {
+      await processPhotoUploadQueue({ overrideRestrictions: true, throwOnFailure: true });
+      const cloudPhotos = await getPhotoLibrary();
+      const synced = await syncMissingCloudPhotos(cloudPhotos, { overrideRestrictions: true });
+      await load();
+      Alert.alert('Photo sync complete', `${synced.length} cloud photo${synced.length === 1 ? '' : 's'} saved locally. Upload queue checked too.`);
+    } catch (error: any) {
+      Alert.alert('Photo sync', error?.message || 'Unable to sync photos right now.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openSessions = async () => {
@@ -375,16 +388,45 @@ export default function SettingsScreen() {
               thumbColor={autoWeather ? Theme.colors.primary : '#b5bdc8'}
             />
           </View>
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <TextSecondary>Upload only on Wi-Fi</TextSecondary>
+              <MutedText>Photo backup waits for an unmetered connection</MutedText>
+            </View>
+            <Switch
+              value={photoUploadSettings.wifiOnly}
+              onValueChange={value => updatePhotoUploadSetting('wifiOnly', value)}
+              trackColor={{ false: '#3b4350', true: '#247c44' }}
+              thumbColor={photoUploadSettings.wifiOnly ? Theme.colors.primary : '#b5bdc8'}
+            />
+          </View>
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <TextSecondary>Upload only while charging</TextSecondary>
+              <MutedText>Photo backup waits until this device is plugged in</MutedText>
+            </View>
+            <Switch
+              value={photoUploadSettings.chargingOnly}
+              onValueChange={value => updatePhotoUploadSetting('chargingOnly', value)}
+              trackColor={{ false: '#3b4350', true: '#247c44' }}
+              thumbColor={photoUploadSettings.chargingOnly ? Theme.colors.primary : '#b5bdc8'}
+            />
+          </View>
+          <Pressable
+            onPress={syncPhotosNow}
+            disabled={saving}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed, saving && styles.disabled]}
+          >
+            <View style={styles.flex}>
+              <TextSecondary>Sync photos now</TextSecondary>
+              <MutedText>Uploads and downloads immediately without changing these settings</MutedText>
+            </View>
+            {saving ? <ActivityIndicator color={Theme.colors.primary} /> : <ChevronRight size={18} color={Theme.colors.mutedForeground} />}
+          </Pressable>
         </Card>
 
         <Card style={styles.card}>
           <H3>Privacy & Security</H3>
-          <SettingRow
-            icon={<Images size={19} color={Theme.colors.mutedForeground} />}
-            title="Web photo access"
-            detail={webPhotoAccessLabels[webPhotoAccess]}
-            onPress={() => setSheet('webPhotoAccess')}
-          />
           <SettingRow
             icon={<ShieldCheck size={19} color={Theme.colors.mutedForeground} />}
             title="Privacy Policy"
@@ -551,28 +593,6 @@ export default function SettingsScreen() {
               )}
                 </>
               )}
-              {sheet === 'webPhotoAccess' && (
-                <>
-              <H3>Web photo access</H3>
-              {(['ask', 'allow', 'reject'] as WebPhotoAccessPreference[]).map(value => (
-                <Pressable
-                  key={value}
-                  style={styles.sheetAction}
-                  onPress={() => chooseWebPhotoAccess(value)}
-                >
-                  <TextSecondary style={webPhotoAccess === value && styles.green}>
-                    {webPhotoAccessLabels[value]}
-                  </TextSecondary>
-                </Pressable>
-              ))}
-              <Pressable
-                style={styles.sheetAction}
-                onPress={() => setSheet(null)}
-              >
-                <MutedText>Cancel</MutedText>
-              </Pressable>
-                </>
-              )}
               {sheet === 'signout' && (
                 <>
               <H3>Sign Out</H3>
@@ -674,6 +694,7 @@ const styles = StyleSheet.create({
   },
   rowStart: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   pressed: { opacity: 0.6 },
+  disabled: { opacity: 0.5 },
   danger: { color: '#e46d6d' },
   errorText: { color: '#e46d6d', marginTop: -8 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },

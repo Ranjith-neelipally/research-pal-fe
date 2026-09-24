@@ -15,6 +15,7 @@ class MainApplication : Application(), ReactApplication {
             packageList = PackageList(this).packages.apply {
                 add(DeviceStoragePackage())
                 add(IdeaReminderPackage())
+                add(PhotoUploadSchedulerPackage())
             },
         )
     }
@@ -27,6 +28,8 @@ class MainApplication : Application(), ReactApplication {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             val channel = android.app.NotificationChannel("quick_idea_reminders", "Quick Idea reminders", android.app.NotificationManager.IMPORTANCE_HIGH)
             getSystemService(android.app.NotificationManager::class.java).createNotificationChannel(channel)
+            val uploadChannel = android.app.NotificationChannel("photo_uploads", "Photo uploads", android.app.NotificationManager.IMPORTANCE_DEFAULT)
+            getSystemService(android.app.NotificationManager::class.java).createNotificationChannel(uploadChannel)
         }
     }
 }

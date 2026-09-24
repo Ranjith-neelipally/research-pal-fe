@@ -1,7 +1,7 @@
 import { View, Image, FlatList, Dimensions, Pressable } from 'react-native';
 import React, { useCallback, useState } from 'react';
-import { getAllPhotoIds } from '../../../services/Photos';
-import { StoredPhoto, usePhotoStorage } from '../../../localStorage';
+import { deletePhoto, getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../services/Photos/index';
+import { StoredPhoto } from '../../../localStorage';
 import { useAuthStore } from '../../../store/auth.store';
 import { Screen } from '../../../components/commonStyles/styles';
 import PhotosModel from './PhotosModel';
@@ -20,7 +20,6 @@ const Photos = () => {
   const [allPhotos, setAllPhotos] = useState<StoredPhoto[]>([]);
   const [selectedPhoto, setselectedPhoto] = useState<StoredPhoto | null>(null);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(true);
-  const { getPhotosByIds } = usePhotoStorage();
   const userId = useAuthStore(state => state.user?._id);
 
   const getPhotoIds = useCallback(async () => {
@@ -30,11 +29,21 @@ const Photos = () => {
     }
 
     setIsLoadingPhotos(true);
-    const response = await getAllPhotoIds(userId!);
-    const stored = await getPhotosByIds(response.data?.allPhotoIds || []);
-    setAllPhotos(stored);
-    setIsLoadingPhotos(false);
-  }, [getPhotosByIds, userId]);
+    try {
+      const cloud = await getPhotoLibrary();
+      await syncMissingCloudPhotos(cloud);
+      setAllPhotos(await Promise.all(cloud.map(async photo => ({
+        id: photo.photoId,
+        name: `${photo.photoId}.jpg`,
+        location: await resolveCloudPhotoFile(photo, 'thumbnail'),
+        mimeType: photo.variants.thumbnail.mimeType,
+        date: photo.capturedAt,
+        cloudPhoto: photo,
+      }))));
+    } finally {
+      setIsLoadingPhotos(false);
+    }
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,10 +70,14 @@ const Photos = () => {
           }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <Pressable onPress={() => setselectedPhoto(item)}>
+            <Pressable onPress={async () => {
+              const cloudPhoto = item.cloudPhoto;
+              const standardLocation = cloudPhoto ? await resolveCloudPhotoFile(cloudPhoto as any, 'standard') : item.location;
+              setselectedPhoto({ ...item, standardLocation });
+            }}>
               <View style={{ width: IMAGE_SIZE, aspectRatio: 1 }}>
                 <Image
-                  source={{ uri: `file://${item.location}` }}
+                  source={{ uri: item.remoteUrl || `file://${item.location}` }}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -91,6 +104,11 @@ const Photos = () => {
           onClose={() => setselectedPhoto(null)}
           selectedPhoto={selectedPhoto}
           userId={userId!}
+          onDelete={async () => {
+            await deletePhoto(selectedPhoto.id);
+            setAllPhotos(current => current.filter(photo => photo.id !== selectedPhoto.id));
+            setselectedPhoto(null);
+          }}
         />
       )}
     </Screen>

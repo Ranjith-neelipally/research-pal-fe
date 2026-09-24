@@ -37,6 +37,8 @@
 	<string>ResearchPal uses your camera to attach field photos to research plots and notes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ResearchPal lets you select photos to attach to research plots and notes.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ResearchPal saves captured field photos to your Photos library so they remain available outside the app.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Animated,
   Image,
   Modal,
@@ -24,13 +25,14 @@ import {
   TabButtonText,
   Tabs,
 } from './styles';
-import { getPhotoDetails } from '../../../services/Photos';
+import { getPhotoDetails } from '../../../services/Photos/index';
 import { PlotNote, normalizeContent } from '../Projects/ProjectNoteDetails/helpers';
 import LoadingState from '../../../components/LoadingState';
 
 interface PhotosModelProps extends MyModalProps {
   selectedPhoto: StoredPhoto;
   userId: string;
+  onDelete?: () => Promise<void>;
 }
 
 interface PhotoDetails {
@@ -55,6 +57,7 @@ const PhotosModel = ({
   onClose,
   selectedPhoto,
   userId,
+  onDelete,
 }: PhotosModelProps) => {
   const [selectedTab, setselectedTab] = useState('plotDetails');
   const [photoDetails, setphotoDetails] = useState<PhotoDetails | null>(null);
@@ -63,7 +66,9 @@ const PhotosModel = ({
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   const normalizedNotes = normalizeContent(photoDetails?.content);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const imageUri = `file://${selectedPhoto.location}`;
+  const imageUri = selectedPhoto.standardLocation
+    ? `file://${selectedPhoto.standardLocation}`
+    : selectedPhoto.remoteUrl || `file://${selectedPhoto.location}`;
   const scale = React.useRef(new Animated.Value(1)).current;
   const translateX = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(0)).current;
@@ -336,6 +341,17 @@ const PhotosModel = ({
         )}
       </View>
         </>
+      )}
+      {onDelete && (
+        <TouchableOpacity
+          onPress={() => Alert.alert('Delete photo', 'This removes the photo from ResearchPal and cloud storage.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => void onDelete().catch(() => Alert.alert('Delete failed', 'Unable to delete this photo. Please try again.')) },
+          ])}
+          style={{ marginTop: 16, alignSelf: 'center' }}
+        >
+          <TextSecondary style={{ color: '#ff4d4f' }}>Delete photo</TextSecondary>
+        </TouchableOpacity>
       )}
       </MyModal>
 

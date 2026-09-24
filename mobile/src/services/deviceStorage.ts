@@ -10,6 +10,7 @@ export interface DeviceStorageInfo {
 interface DeviceStorageNativeModule {
   getStorageInfo?(): Promise<{ totalBytes?: number; freeBytes?: number; usedBytes?: number; totalSpace?: number; freeSpace?: number }>;
   saveToDownloads(fileName: string, mimeType: string, base64Data: string): Promise<string>;
+  saveToPhotos?(fileName: string, mimeType: string, base64Data: string): Promise<string>;
 }
 
 const nativeDeviceStorage = NativeModules.DeviceStorage as
@@ -52,5 +53,14 @@ export const saveToDownloads = async (fileName: string, mimeType: string, base64
   }
   const uri = await nativeDeviceStorage.saveToDownloads(fileName, mimeType, base64Data);
   if (!uri) throw new Error('Android did not return a public Downloads URI.');
+  return { fileName, uri };
+};
+
+export const saveToPhotos = async (fileName: string, mimeType: string, base64Data: string) => {
+  if (typeof nativeDeviceStorage?.saveToPhotos !== 'function') {
+    throw new Error(`${Platform.OS} Photos publisher is unavailable.`);
+  }
+  const uri = await nativeDeviceStorage.saveToPhotos(fileName, mimeType, base64Data);
+  if (!uri) throw new Error(`${Platform.OS} did not return a public Photos URI.`);
   return { fileName, uri };
 };

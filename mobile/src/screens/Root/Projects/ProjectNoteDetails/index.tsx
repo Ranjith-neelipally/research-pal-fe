@@ -26,6 +26,7 @@ import {
   getPlotNoteService,
 } from '../../../../services/Projects/Plot';
 import { StoredPhoto, usePhotoStorage } from '../../../../localStorage';
+import { getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../../services/Photos';
 import { Card } from '../../../../components/Card/styles';
 import {
   getPlotDisplayName,
@@ -97,6 +98,13 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
   }, [sortNotes]);
 
   const loadPlotNotePhotos = useCallback(async (notes: PlotNote[]) => {
+    const photoIdSet = new Set<string>();
+    notes.forEach(note => {
+      const photoIds = note.photoIds?.length ? note.photoIds : getPhotoIdsFromContent(note.content);
+      photoIds.forEach(photoId => photoIdSet.add(photoId));
+    });
+    const cloud = photoIdSet.size ? await getPhotoLibrary().catch(() => []) : [];
+    await syncMissingCloudPhotos(cloud.filter(photo => photoIdSet.has(photo.photoId)));
     const photoEntries = await Promise.all(
       notes.map(async note => {
         const photoIds = note.photoIds?.length
@@ -108,7 +116,18 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
         }
 
         const storedPhotos = await getPhotosByIds(photoIds);
-        return [note._id, storedPhotos] as const;
+        const localIds = new Set(storedPhotos.map(photo => photo.id));
+        const remotePhotos = await Promise.all(cloud
+          .filter(photo => photoIds.includes(photo.photoId) && !localIds.has(photo.photoId))
+          .map(async photo => ({
+            id: photo.photoId,
+            name: `${photo.photoId}.jpg`,
+            location: await resolveCloudPhotoFile(photo, 'thumbnail'),
+            mimeType: photo.variants.thumbnail.mimeType,
+            date: photo.capturedAt,
+            cloudPhoto: photo,
+          })));
+        return [note._id, [...storedPhotos, ...remotePhotos] as StoredPhoto[]] as const;
       }),
     );
 

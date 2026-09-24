@@ -57,4 +57,31 @@ class DeviceStorageModule(
             promise.reject("DOWNLOAD_SAVE_FAILED", "Unable to publish file to Downloads", error)
         }
     }
+
+    @ReactMethod
+    fun saveToPhotos(fileName: String, mimeType: String, base64Data: String, promise: Promise) {
+        try {
+            val resolver = reactApplicationContext.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/ResearchPal")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Unable to create Photos entry")
+            try {
+                resolver.openOutputStream(uri)?.use { it.write(Base64.decode(base64Data, Base64.DEFAULT)) }
+                    ?: throw IllegalStateException("Unable to open Photos output stream")
+                values.clear(); values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+                promise.resolve(uri.toString())
+            } catch (error: Exception) {
+                resolver.delete(uri, null, null)
+                throw error
+            }
+        } catch (error: Exception) {
+            promise.reject("PHOTOS_SAVE_FAILED", "Unable to publish image to Photos", error)
+        }
+    }
 }

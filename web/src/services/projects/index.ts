@@ -127,6 +127,7 @@ export async function addPlotNoteService(payload: {
   projectId: string;
   plotId: string;
   content: string[];
+  photoIds?: string[];
 }) {
   const response = await api.post("/projects/note", payload);
   return unwrap<PlotNoteDto>(response.data);
@@ -137,6 +138,7 @@ export async function updatePlotNoteService(payload: {
   plotId: string;
   noteId: string;
   content: string[];
+  photoIds?: string[];
 }) {
   const response = await api.patch("/projects/note", payload);
   const data = unwrap<{ updated?: PlotNoteDto } | PlotNoteDto>(response.data);

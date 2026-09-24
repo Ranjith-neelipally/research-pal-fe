@@ -10,9 +10,15 @@ export interface StoredPhoto {
   name: string;
   location: string;
   date: string;
+  mimeType?: string;
+  remoteUrl?: string;
+  standardLocation?: string;
+  cloudPhoto?: unknown;
 }
 
 const APP_PHOTO_DIR = `${RNFS.DocumentDirectoryPath}/photos`;
+const PHOTO_PICKER_OPTIONS = { mediaType: 'photo' as const };
+const CAMERA_OPTIONS = { ...PHOTO_PICKER_OPTIONS, saveToPhotos: true };
 const photoInventoryListeners = new Set<() => void | Promise<void>>();
 
 export const subscribeLocalPhotoInventoryChanges = (listener: () => void | Promise<void>) => {
@@ -58,12 +64,30 @@ const ensurePhotoDir = async (): Promise<void> => {
   }
 };
 
-const copyPhotoToAppStorage = async (uri: string): Promise<StoredPhoto> => {
+export const savePhotoToAppStorage = async (
+  uri: string,
+  originalName?: string,
+  mimeType?: string,
+  preferredId?: string,
+  capturedAt?: string,
+): Promise<StoredPhoto> => {
   await ensurePhotoDir();
 
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const name = `${id}.jpg`;
+  const id = preferredId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const extension = originalName?.match(/\.[a-zA-Z0-9]+$/)?.[0]?.toLowerCase() || '.jpg';
+  const name = `${id}${extension}`;
   const destPath = `${APP_PHOTO_DIR}/${name}`;
+
+  if (await RNFS.exists(destPath)) {
+    const stat = await RNFS.stat(destPath);
+    return {
+      id,
+      name,
+      location: destPath,
+      date: capturedAt || (stat.mtime ? new Date(stat.mtime).toISOString() : new Date().toISOString()),
+      mimeType: mimeType || 'image/jpeg',
+    };
+  }
 
   await RNFS.copyFile(uri.replace('file://', ''), destPath);
 
@@ -71,23 +95,26 @@ const copyPhotoToAppStorage = async (uri: string): Promise<StoredPhoto> => {
     id,
     name,
     location: destPath,
-    date: new Date().toISOString(),
+    date: capturedAt || new Date().toISOString(),
+    mimeType: mimeType || 'image/jpeg',
   };
 };
 
-const getPhotoById = async (id: string): Promise<StoredPhoto | null> => {
-  const name = `${id}.jpg`;
-  const path = `${APP_PHOTO_DIR}/${name}`;
+const copyPhotoToAppStorage = async (uri: string, originalName?: string, mimeType?: string): Promise<StoredPhoto> =>
+  savePhotoToAppStorage(uri, originalName, mimeType);
 
-  const exists = await RNFS.exists(path);
-  if (!exists) return null;
+export const getLocalPhotoById = async (id: string): Promise<StoredPhoto | null> => {
+  await ensurePhotoDir();
+  const files = await RNFS.readDir(APP_PHOTO_DIR);
+  const file = files.find(entry => entry.isFile() && entry.name.startsWith(`${id}.`));
+  if (!file) return null;
 
-  const stat = await RNFS.stat(path);
+  const stat = await RNFS.stat(file.path);
 
   return {
     id,
-    name,
-    location: path,
+    name: file.name,
+    location: file.path,
     date: stat.mtime
       ? new Date(stat.mtime).toISOString()
       : new Date().toISOString(),
@@ -164,17 +191,7 @@ export const cleanupProjectLocalData = async (
   );
 };
 
-export const getPhotoByIdForStreaming = getPhotoById;
-
-export const getAvailablePhotoIdsForStreaming = async (): Promise<string[]> => {
-  const directoryExists = await RNFS.exists(APP_PHOTO_DIR);
-  if (!directoryExists) return [];
-
-  const entries = await RNFS.readDir(APP_PHOTO_DIR);
-  return entries
-    .filter(entry => entry.isFile() && entry.name.endsWith('.jpg'))
-    .map(entry => entry.name.replace(/\.jpg$/, ''));
-};
+export const publishLocalPhotoInventoryChanged = notifyLocalPhotoInventoryChanged;
 
 const settingsAlert = (title: string, message: string) => {
   Alert.alert(title, message, [
@@ -233,7 +250,7 @@ export const usePhotoStorage = () => {
   > => {
     if (!await ensureCameraPermission()) return null;
     let res;
-    try { res = await launchCamera({ mediaType: 'photo' }); }
+    try { res = await launchCamera(CAMERA_OPTIONS); }
     catch (error) { showPickerError(error, 'camera'); return null; }
 
     if (res.errorCode) { showPickerError(res, 'camera'); return null; }
@@ -244,7 +261,7 @@ export const usePhotoStorage = () => {
 
     for (const asset of res.assets) {
       if (asset.uri) {
-        photos.push(await copyPhotoToAppStorage(asset.uri));
+        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName, asset.type));
       }
     }
 
@@ -257,7 +274,7 @@ export const usePhotoStorage = () => {
     StoredPhoto[] | null
   > => {
     let res;
-    try { res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 0 }); }
+    try { res = await launchImageLibrary({ ...PHOTO_PICKER_OPTIONS, selectionLimit: 0 }); }
     catch (error) { showPickerError(error, 'photos'); return null; }
 
     if (res.errorCode) { showPickerError(res, 'photos'); return null; }
@@ -268,7 +285,7 @@ export const usePhotoStorage = () => {
 
     for (const asset of res.assets) {
       if (asset.uri) {
-        photos.push(await copyPhotoToAppStorage(asset.uri));
+        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName, asset.type));
       }
     }
 
@@ -304,7 +321,7 @@ export const usePhotoStorage = () => {
       const photos: StoredPhoto[] = [];
 
       for (const id of photoIds) {
-        const photo = await getPhotoById(id);
+        const photo = await getLocalPhotoById(id);
         if (photo) {
           photos.push(photo);
         }

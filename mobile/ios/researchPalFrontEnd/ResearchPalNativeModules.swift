@@ -1,4 +1,6 @@
 import Foundation
+import Network
+import Photos
 import React
 import UIKit
 import UserNotifications
@@ -33,6 +35,141 @@ final class DeviceStorage: NSObject, RCTBridgeModule {
       ])
     } catch {
       reject("STORAGE_INFO_UNAVAILABLE", "Unable to read iOS data-volume capacity", error)
+    }
+  }
+
+  @objc(saveToPhotos:mimeType:base64Data:resolver:rejecter:)
+  func saveToPhotos(
+    _ fileName: String,
+    mimeType _: String,
+    base64Data: String,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let data = Data(base64Encoded: base64Data),
+          let image = UIImage(data: data) else {
+      reject("PHOTOS_SAVE_FAILED", "Unable to decode image data", nil)
+      return
+    }
+
+    let save = {
+      PHPhotoLibrary.shared().performChanges({
+        PHAssetChangeRequest.creationRequestForAsset(from: image)
+      }) { success, error in
+        if let error {
+          reject("PHOTOS_SAVE_FAILED", "Unable to save image to Photos", error)
+          return
+        }
+        success ? resolve("photos://ResearchPal/\(fileName)") : reject("PHOTOS_SAVE_FAILED", "Unable to save image to Photos", nil)
+      }
+    }
+
+    if #available(iOS 14, *) {
+      let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+      if status == .authorized || status == .limited {
+        save()
+        return
+      }
+      PHPhotoLibrary.requestAuthorization(for: .addOnly) { next in
+        (next == .authorized || next == .limited) ? save() : reject("PHOTOS_PERMISSION_DENIED", "Photos add permission was denied", nil)
+      }
+    } else {
+      let status = PHPhotoLibrary.authorizationStatus()
+      if status == .authorized {
+        save()
+        return
+      }
+      PHPhotoLibrary.requestAuthorization { next in
+        next == .authorized ? save() : reject("PHOTOS_PERMISSION_DENIED", "Photos add permission was denied", nil)
+      }
+    }
+  }
+}
+
+@objc(PhotoUploadScheduler)
+final class PhotoUploadScheduler: NSObject, RCTBridgeModule {
+  private var tasks: [Int: UIBackgroundTaskIdentifier] = [:]
+
+  static func moduleName() -> String! { "PhotoUploadScheduler" }
+  static func requiresMainQueueSetup() -> Bool { false }
+
+  @objc(getConditions:rejecter:)
+  func getConditions(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter _: RCTPromiseRejectBlock
+  ) {
+    UIDevice.current.isBatteryMonitoringEnabled = true
+    let charging = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
+    let monitor = NWPathMonitor()
+    let queue = DispatchQueue(label: "ResearchPal.PhotoUpload.Network")
+    var settled = false
+    monitor.pathUpdateHandler = { path in
+      if settled { return }
+      settled = true
+      monitor.cancel()
+      resolve([
+        "isUnmetered": !path.isExpensive,
+        "isCharging": charging,
+      ])
+    }
+    monitor.start(queue: queue)
+    queue.asyncAfter(deadline: .now() + 1.0) {
+      if settled { return }
+      settled = true
+      monitor.cancel()
+      resolve([
+        "isUnmetered": true,
+        "isCharging": charging,
+      ])
+    }
+  }
+
+  @objc(schedule:chargingOnly:resolver:rejecter:)
+  func schedule(
+    _ wifiOnly: Bool,
+    chargingOnly: Bool,
+    resolver resolve: RCTPromiseResolveBlock,
+    rejecter _: RCTPromiseRejectBlock
+  ) {
+    resolve(nil)
+  }
+
+  @objc(beginBackgroundTask:rejecter:)
+  func beginBackgroundTask(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    rejecter _: RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      var identifier: UIBackgroundTaskIdentifier = .invalid
+      identifier = UIApplication.shared.beginBackgroundTask(withName: "ResearchPalPhotoUpload") {
+        DispatchQueue.main.async {
+          if identifier != .invalid {
+            UIApplication.shared.endBackgroundTask(identifier)
+          }
+        }
+      }
+      if identifier == .invalid {
+        resolve(nil)
+        return
+      }
+      let key = Int(identifier.rawValue)
+      self.tasks[key] = identifier
+      resolve(key)
+    }
+  }
+
+  @objc(endBackgroundTask:resolver:rejecter:)
+  func endBackgroundTask(
+    _ taskId: NSNumber,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter _: RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      let key = taskId.intValue
+      if let identifier = self.tasks.removeValue(forKey: key), identifier != .invalid {
+        UIApplication.shared.endBackgroundTask(identifier)
+      }
+      resolve(nil)
     }
   }
 }

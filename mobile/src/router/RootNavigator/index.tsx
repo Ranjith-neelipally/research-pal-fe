@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -9,8 +9,6 @@ import ProjectsHeader from '../ProjectsNavigator/ProjectsHeader';
 import PlotNotesDetails from '../../screens/Root/Projects/ProjectNoteDetails';
 import PlotNoteEditorScreen from '../../screens/Root/Projects/ProjectNoteDetails/editor';
 import ObservationDetails from '../../screens/Root/Projects/Observations/ObservationDetails';
-import { startMobilePhotoStreaming, stopMobilePhotoStreaming } from '../../services/photoStreaming';
-import { useAuthStore } from '../../store/auth.store';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -54,17 +52,6 @@ function ProjectsStackNavigator() {
 }
 
 export default function RootNavigator() {
-  const token = useAuthStore(state => state.user?.token);
-
-  useEffect(() => {
-    if (!token) {
-      stopMobilePhotoStreaming('auth-missing');
-      return undefined;
-    }
-    startMobilePhotoStreaming();
-    return () => stopMobilePhotoStreaming('root-unmount-or-auth-change');
-  }, [token]);
-
   return (
     <Tab.Navigator
       initialRouteName="Home"

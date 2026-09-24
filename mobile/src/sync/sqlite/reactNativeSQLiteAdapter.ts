@@ -1,46 +1,61 @@
 import { SQLiteAdapter, SQLiteResultSet } from './adapter';
+import { NitroSQLite, open } from 'react-native-nitro-sqlite';
 
-type QueryResult = {
+const DB_NAME = 'research_pal_sync.db';
+const DB_LOCATION = 'default';
+
+let adapterPromise: Promise<SQLiteAdapter> | null = null;
+
+const toResultSet = (result: {
   rows: {
     length: number;
-    item: (index: number) => Record<string, unknown>;
+    item: (index: number) => Record<string, unknown> | undefined;
   };
-  rowsAffected: number;
+  rowsAffected?: number;
   insertId?: number;
-};
-
-const SQLITE_PACKAGE_NAME = 'react-native-sqlite-storage';
-
-const toPromiseResult = (result: QueryResult): SQLiteResultSet => {
+}): SQLiteResultSet => {
   return {
-    rows: result.rows,
-    rowsAffected: result.rowsAffected,
+    rows: {
+      length: result.rows.length,
+      item: index => result.rows.item(index) || {},
+    },
+    rowsAffected: result.rowsAffected || 0,
     insertId: result.insertId,
   };
 };
 
 export const createReactNativeSQLiteAdapter = async (): Promise<SQLiteAdapter> => {
-  const sqliteModule = require(SQLITE_PACKAGE_NAME) as {
-    enablePromise: (enabled: boolean) => void;
-    openDatabase: (params: { name: string; location: string }) => Promise<{
-      executeSql: (
-        sql: string,
-        params?: Array<string | number | null>,
-      ) => Promise<[QueryResult]>;
-    }>;
-  };
+  if (adapterPromise) {
+    return adapterPromise;
+  }
 
-  sqliteModule.enablePromise(true);
+  adapterPromise = Promise.resolve().then(() => {
+    try {
+      const db = open({
+        name: DB_NAME,
+        location: DB_LOCATION,
+      });
 
-  const db = await sqliteModule.openDatabase({
-    name: 'research_pal_sync.db',
-    location: 'default',
+      return {
+        executeSql: async (sql, params = []) => {
+          const result = await db.executeAsync(sql, params);
+          return toResultSet(result);
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('already open')) {
+        throw error;
+      }
+
+      return {
+        executeSql: async (sql, params = []) => {
+          const result = await NitroSQLite.executeAsync(DB_NAME, sql, params);
+          return toResultSet(result);
+        },
+      };
+    }
   });
 
-  return {
-    executeSql: async (sql, params = []) => {
-      const [result] = await db.executeSql(sql, params);
-      return toPromiseResult(result);
-    },
-  };
+  return adapterPromise;
 };

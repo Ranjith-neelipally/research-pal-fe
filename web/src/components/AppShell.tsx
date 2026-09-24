@@ -103,7 +103,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <aside className="hidden h-screen w-64 shrink-0 flex-col gap-2 border-r border-sidebar-border bg-sidebar p-4 md:flex">
         <div className="mb-4 flex items-center gap-3 px-2 py-3">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-primary/15 ring-1 ring-primary/30">
-            <img src="/logo.png" alt="ResearchPal" className="h-8 w-8 object-contain" />
+            <img src="/app-icon.png" alt="ResearchPal" className="h-8 w-8 object-contain" />
           </div>
           <div>
             <div className="text-base font-semibold tracking-tight">ResearchPal</div>
