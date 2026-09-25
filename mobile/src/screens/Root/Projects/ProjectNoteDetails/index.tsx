@@ -26,7 +26,7 @@ import {
   getPlotNoteService,
 } from '../../../../services/Projects/Plot';
 import { StoredPhoto, usePhotoStorage } from '../../../../localStorage';
-import { getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../../services/Photos';
+import { getCachedPhotoLibrary, resolvePhotoFile } from '../../../../services/Photos';
 import { Card } from '../../../../components/Card/styles';
 import {
   getPlotDisplayName,
@@ -103,8 +103,7 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
       const photoIds = note.photoIds?.length ? note.photoIds : getPhotoIdsFromContent(note.content);
       photoIds.forEach(photoId => photoIdSet.add(photoId));
     });
-    const cloud = photoIdSet.size ? await getPhotoLibrary().catch(() => []) : [];
-    await syncMissingCloudPhotos(cloud.filter(photo => photoIdSet.has(photo.photoId)));
+    const cached = photoIdSet.size ? await getCachedPhotoLibrary().catch(() => []) : [];
     const photoEntries = await Promise.all(
       notes.map(async note => {
         const photoIds = note.photoIds?.length
@@ -117,17 +116,13 @@ const PlotNoteDetailsScreen = ({ route }: any) => {
 
         const storedPhotos = await getPhotosByIds(photoIds);
         const localIds = new Set(storedPhotos.map(photo => photo.id));
-        const remotePhotos = await Promise.all(cloud
-          .filter(photo => photoIds.includes(photo.photoId) && !localIds.has(photo.photoId))
+        const remotePhotos = await Promise.all(cached
+          .filter(photo => photoIds.includes(photo.id) && !localIds.has(photo.id))
           .map(async photo => ({
-            id: photo.photoId,
-            name: `${photo.photoId}.jpg`,
-            location: await resolveCloudPhotoFile(photo, 'thumbnail'),
-            mimeType: photo.variants.thumbnail.mimeType,
-            date: photo.capturedAt,
-            cloudPhoto: photo,
+            ...photo,
+            location: await resolvePhotoFile(photo, 'thumbnail').catch(() => photo.location),
           })));
-        return [note._id, [...storedPhotos, ...remotePhotos] as StoredPhoto[]] as const;
+        return [note._id, [...storedPhotos, ...remotePhotos].filter(photo => Boolean(photo.location)) as StoredPhoto[]] as const;
       }),
     );
 

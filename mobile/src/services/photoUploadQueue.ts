@@ -1,7 +1,7 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import { initializeOfflineSyncFoundation } from '../sync';
 import { executeSyncSql } from '../sync/sqlite/database';
-import type { StoredPhoto } from '../localStorage';
+import { updateLocalPhotoUploadStatus, upsertLocalPhotoRecord, type StoredPhoto } from '../localStorage';
 import { uploadPhoto } from './Photos';
 import { conditionsAllowUpload, schedulePhotoUploadWork, withPhotoUploadBackgroundTask } from './photoUploadScheduler';
 
@@ -113,6 +113,14 @@ export async function enqueuePhotoUploads(items: QueuePhotoInput[]) {
         now,
       ],
     );
+    await upsertLocalPhotoRecord({
+      ...item.photo,
+      projectId: item.projectId,
+      plotId: item.plotId,
+      noteId: item.noteId || null,
+      date: item.capturedAt || item.photo.date || now,
+      uploadStatus: 'pending',
+    });
     queuedIds.push(item.photo.id);
   }
   if (queuedIds.length) {
@@ -194,6 +202,7 @@ async function updateStatus(photoId: string, status: PhotoUploadQueueItem['statu
      WHERE photo_id = ?;`,
     [status, status, error || null, status, new Date().toISOString(), new Date().toISOString(), photoId],
   );
+  await updateLocalPhotoUploadStatus(photoId, status);
 }
 
 export async function processPhotoUploadQueue(
@@ -229,6 +238,9 @@ export async function processPhotoUploadQueue(
             location: item.localPath,
             date: item.capturedAt,
             mimeType: item.mimeType || 'image/jpeg',
+            projectId: item.projectId,
+            plotId: item.plotId,
+            noteId: item.noteId || null,
           }, {
             projectId: item.projectId,
             plotId: item.plotId,

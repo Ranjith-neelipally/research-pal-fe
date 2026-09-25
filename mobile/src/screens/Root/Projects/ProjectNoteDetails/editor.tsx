@@ -33,7 +33,7 @@ import {
 import { validateRequiredMaxLength } from '../../../../utils/apiValidation';
 import { useNoteEventsStore } from '../../../../store/noteEvents.store';
 import { toLocalDateString } from '../../../../utils/common';
-import { getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../../services/Photos/index';
+import { getCachedPhotoLibrary, resolvePhotoFile } from '../../../../services/Photos/index';
 import { enqueuePhotoUploads, processPhotoUploadQueue } from '../../../../services/photoUploadQueue';
 
 const photoUri = (photo: StoredPhoto) => photo.remoteUrl || `file://${photo.location}`;
@@ -81,23 +81,18 @@ const PlotNoteEditorScreen = ({ route }: any) => {
         return;
       }
 
-      const [stored, cloud] = await Promise.all([
+      const [stored, merged] = await Promise.all([
         getPhotosByIds(photoIds),
-        getPhotoLibrary().catch(() => []),
+        getCachedPhotoLibrary().catch(() => []),
       ]);
-      await syncMissingCloudPhotos(cloud.filter(photo => photoIds.includes(photo.photoId)));
       const localIds = new Set(stored.map(photo => photo.id));
-      const remote = await Promise.all(cloud
-        .filter(photo => photoIds.includes(photo.photoId) && !localIds.has(photo.photoId))
+      const remote = await Promise.all(merged
+        .filter(photo => photoIds.includes(photo.id) && !localIds.has(photo.id))
         .map(async photo => ({
-          id: photo.photoId,
-          name: `${photo.photoId}.jpg`,
-          location: await resolveCloudPhotoFile(photo, 'thumbnail'),
-          mimeType: photo.variants.thumbnail.mimeType,
-          date: photo.capturedAt,
-          cloudPhoto: photo,
+          ...photo,
+          location: await resolvePhotoFile(photo, 'thumbnail').catch(() => photo.location),
         })));
-      setPhotos([...stored, ...remote]);
+      setPhotos([...stored, ...remote].filter(photo => Boolean(photo.location)));
     };
 
     loadInitialPhotos();
@@ -418,8 +413,7 @@ const PlotNoteEditorScreen = ({ route }: any) => {
               ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
               renderItem={({ item: photo }) => (
                 <Pressable onPress={async () => {
-                  const cloudPhoto = photo.cloudPhoto;
-                  const standardLocation = cloudPhoto ? await resolveCloudPhotoFile(cloudPhoto as any, 'standard') : photo.location;
+                  const standardLocation = await resolvePhotoFile(photo, 'standard').catch(() => photo.location);
                   setPreviewPhoto({ ...photo, standardLocation });
                 }}>
                   <TouchableOpacity

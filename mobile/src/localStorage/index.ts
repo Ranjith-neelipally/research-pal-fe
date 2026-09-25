@@ -1,8 +1,10 @@
 import { useCallback } from 'react';
 import { Alert, Linking, PermissionsAndroid, Platform } from 'react-native';
 import * as RNFS from '@dr.pogodin/react-native-fs';
+import ImageResizer from '@bam.tech/react-native-image-resizer';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { executeSyncSql } from '../sync/sqlite/database';
+import { initializeOfflineSyncFoundation } from '../sync';
 import { getDeviceStorageInfo } from '../services/deviceStorage';
 
 export interface StoredPhoto {
@@ -14,6 +16,10 @@ export interface StoredPhoto {
   remoteUrl?: string;
   standardLocation?: string;
   cloudPhoto?: unknown;
+  projectId?: string;
+  plotId?: string;
+  noteId?: string | null;
+  uploadStatus?: string;
 }
 
 const APP_PHOTO_DIR = `${RNFS.DocumentDirectoryPath}/photos`;
@@ -64,6 +70,118 @@ const ensurePhotoDir = async (): Promise<void> => {
   }
 };
 
+const debugPhoto = (message: string, details: Record<string, unknown>) => {
+  if (__DEV__) console.log(`[photos/local] ${message}`, details);
+};
+
+const normalizePhotoPath = (uri: string) => uri.replace('file://', '');
+
+const ensurePhotoMetadataReady = async () => {
+  await initializeOfflineSyncFoundation();
+};
+
+const parseCloudPhoto = (value: unknown) => {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(String(value));
+  } catch (error) {
+    if (__DEV__) console.error('[photos/local] unable to parse cloud metadata', error);
+    return undefined;
+  }
+};
+
+const rowToStoredPhoto = (row: Record<string, unknown>): StoredPhoto => ({
+  id: String(row.photo_id),
+  name: row.original_name ? String(row.original_name) : `${String(row.photo_id)}.jpg`,
+  location: row.local_path ? String(row.local_path) : '',
+  date: String(row.captured_at || row.created_at || new Date().toISOString()),
+  mimeType: row.mime_type ? String(row.mime_type) : 'image/jpeg',
+  cloudPhoto: parseCloudPhoto(row.cloud_json),
+  projectId: row.project_id ? String(row.project_id) : undefined,
+  plotId: row.plot_id ? String(row.plot_id) : undefined,
+  noteId: row.note_id ? String(row.note_id) : null,
+  uploadStatus: row.upload_status ? String(row.upload_status) : undefined,
+});
+
+export const upsertLocalPhotoRecord = async (photo: StoredPhoto) => {
+  await ensurePhotoMetadataReady();
+  const now = new Date().toISOString();
+  await executeSyncSql(
+    `INSERT INTO local_photos (
+      photo_id, local_path, original_name, mime_type, project_id, plot_id, note_id,
+      cloud_json, upload_status, captured_at, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(photo_id) DO UPDATE SET
+      local_path = COALESCE(excluded.local_path, local_photos.local_path),
+      original_name = COALESCE(excluded.original_name, local_photos.original_name),
+      mime_type = COALESCE(excluded.mime_type, local_photos.mime_type),
+      project_id = COALESCE(excluded.project_id, local_photos.project_id),
+      plot_id = COALESCE(excluded.plot_id, local_photos.plot_id),
+      note_id = COALESCE(excluded.note_id, local_photos.note_id),
+      cloud_json = COALESCE(excluded.cloud_json, local_photos.cloud_json),
+      upload_status = COALESCE(excluded.upload_status, local_photos.upload_status),
+      captured_at = COALESCE(excluded.captured_at, local_photos.captured_at),
+      updated_at = excluded.updated_at;`,
+    [
+      photo.id,
+      photo.location || null,
+      photo.name || null,
+      photo.mimeType || 'image/jpeg',
+      photo.projectId || null,
+      photo.plotId || null,
+      photo.noteId || null,
+      photo.cloudPhoto ? JSON.stringify(photo.cloudPhoto) : null,
+      photo.uploadStatus || null,
+      photo.date || now,
+      now,
+      now,
+    ],
+  );
+  debugPhoto('record upserted', {
+    photoId: photo.id,
+    storedLocalUri: photo.location,
+    projectId: photo.projectId,
+    plotId: photo.plotId,
+    noteId: photo.noteId,
+    uploadState: photo.uploadStatus,
+  });
+};
+
+export const listLocalPhotoRecords = async (): Promise<StoredPhoto[]> => {
+  await ensurePhotoMetadataReady();
+  const result = await executeSyncSql(
+    `SELECT * FROM local_photos ORDER BY captured_at DESC, created_at DESC;`,
+  );
+  const records: StoredPhoto[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    records.push(rowToStoredPhoto(result.rows.item(index) as Record<string, unknown>));
+  }
+  return records;
+};
+
+export const updateLocalPhotoUploadStatus = async (photoId: string, status: string) => {
+  await ensurePhotoMetadataReady();
+  await executeSyncSql(
+    `UPDATE local_photos SET upload_status = ?, updated_at = ? WHERE photo_id = ?;`,
+    [status, new Date().toISOString(), photoId],
+  );
+  debugPhoto('upload status updated', { photoId, uploadState: status });
+};
+
+const compressToCanonicalPhoto = async (uri: string) =>
+  ImageResizer.createResizedImage(
+    uri.startsWith('file://') ? uri : `file://${uri}`,
+    1920,
+    1920,
+    'JPEG',
+    82,
+    0,
+    undefined,
+    false,
+    { mode: 'contain', onlyScaleDown: true },
+  );
+
 export const savePhotoToAppStorage = async (
   uri: string,
   originalName?: string,
@@ -74,51 +192,85 @@ export const savePhotoToAppStorage = async (
   await ensurePhotoDir();
 
   const id = preferredId || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const extension = originalName?.match(/\.[a-zA-Z0-9]+$/)?.[0]?.toLowerCase() || '.jpg';
-  const name = `${id}${extension}`;
+  const name = `${id}.jpg`;
   const destPath = `${APP_PHOTO_DIR}/${name}`;
 
   if (await RNFS.exists(destPath)) {
     const stat = await RNFS.stat(destPath);
-    return {
+    const stored = {
       id,
       name,
       location: destPath,
       date: capturedAt || (stat.mtime ? new Date(stat.mtime).toISOString() : new Date().toISOString()),
       mimeType: mimeType || 'image/jpeg',
     };
+    await upsertLocalPhotoRecord(stored);
+    return stored;
   }
 
-  await RNFS.copyFile(uri.replace('file://', ''), destPath);
+  await RNFS.copyFile(normalizePhotoPath(uri), destPath);
 
-  return {
+  const stored = {
     id,
     name,
     location: destPath,
     date: capturedAt || new Date().toISOString(),
     mimeType: mimeType || 'image/jpeg',
   };
+  await upsertLocalPhotoRecord(stored);
+  return stored;
 };
 
-const copyPhotoToAppStorage = async (uri: string, originalName?: string, mimeType?: string): Promise<StoredPhoto> =>
-  savePhotoToAppStorage(uri, originalName, mimeType);
+const copyPhotoToAppStorage = async (uri: string, originalName?: string): Promise<StoredPhoto> => {
+  let compressed: Awaited<ReturnType<typeof compressToCanonicalPhoto>> | null = null;
+  try {
+    compressed = await compressToCanonicalPhoto(uri);
+    return await savePhotoToAppStorage(compressed.uri, originalName || compressed.name, 'image/jpeg');
+  } finally {
+    if (compressed?.path) await RNFS.unlink(compressed.path).catch(() => undefined);
+  }
+};
 
 export const getLocalPhotoById = async (id: string): Promise<StoredPhoto | null> => {
   await ensurePhotoDir();
+  await ensurePhotoMetadataReady();
+  const existingRecord = await executeSyncSql(
+    `SELECT * FROM local_photos WHERE photo_id = ? LIMIT 1;`,
+    [id],
+  );
+  if (existingRecord.rows.length) {
+    const record = rowToStoredPhoto(existingRecord.rows.item(0) as Record<string, unknown>);
+    const exists = Boolean(record.location && await RNFS.exists(record.location));
+    debugPhoto('record lookup', {
+      photoId: id,
+      storedLocalUri: record.location,
+      localExists: exists,
+      cloudId: record.cloudPhoto ? 'present' : null,
+      uploadState: record.uploadStatus,
+      projectId: record.projectId,
+      plotId: record.plotId,
+      noteId: record.noteId,
+    });
+    if (exists) return record;
+  }
   const files = await RNFS.readDir(APP_PHOTO_DIR);
   const file = files.find(entry => entry.isFile() && entry.name.startsWith(`${id}.`));
   if (!file) return null;
 
   const stat = await RNFS.stat(file.path);
 
-  return {
+  const migrated = {
     id,
     name: file.name,
     location: file.path,
     date: stat.mtime
       ? new Date(stat.mtime).toISOString()
       : new Date().toISOString(),
+    mimeType: 'image/jpeg',
   };
+  await upsertLocalPhotoRecord(migrated);
+  debugPhoto('legacy file migrated', { photoId: id, storedLocalUri: file.path });
+  return migrated;
 };
 
 export const cleanupProjectLocalData = async (
@@ -172,6 +324,7 @@ export const cleanupProjectLocalData = async (
   await executeSyncSql('DELETE FROM notes WHERE project_id = ?', [projectId]);
   await executeSyncSql('DELETE FROM plots WHERE project_id = ?', [projectId]);
   await executeSyncSql('DELETE FROM projects WHERE id = ?', [projectId]);
+  await executeSyncSql('DELETE FROM local_photos WHERE project_id = ?', [projectId]);
   await executeSyncSql(
     "DELETE FROM outbox_ops WHERE entity_type = 'project' AND entity_id = ?",
     [projectId],
@@ -261,7 +414,7 @@ export const usePhotoStorage = () => {
 
     for (const asset of res.assets) {
       if (asset.uri) {
-        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName, asset.type));
+        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName));
       }
     }
 
@@ -285,7 +438,7 @@ export const usePhotoStorage = () => {
 
     for (const asset of res.assets) {
       if (asset.uri) {
-        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName, asset.type));
+        photos.push(await copyPhotoToAppStorage(asset.uri, asset.fileName));
       }
     }
 

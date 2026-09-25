@@ -115,8 +115,23 @@ export const SYNC_TABLE_SCHEMAS: string[] = [
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );`,
+  `CREATE TABLE IF NOT EXISTS local_photos (
+    photo_id TEXT PRIMARY KEY NOT NULL,
+    local_path TEXT,
+    original_name TEXT,
+    mime_type TEXT,
+    project_id TEXT,
+    plot_id TEXT,
+    note_id TEXT,
+    cloud_json TEXT,
+    upload_status TEXT,
+    captured_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );`,
   `CREATE INDEX IF NOT EXISTS idx_outbox_status_created_at ON outbox_ops(status, created_at);`,
   `CREATE INDEX IF NOT EXISTS idx_photo_upload_queue_status ON photo_upload_queue(status, updated_at);`,
+  `CREATE INDEX IF NOT EXISTS idx_local_photos_project ON local_photos(project_id, plot_id, note_id);`,
   `CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);`,
   `CREATE INDEX IF NOT EXISTS idx_plots_project ON plots(project_id);`,
   `CREATE INDEX IF NOT EXISTS idx_notes_plot ON notes(plot_id);`,

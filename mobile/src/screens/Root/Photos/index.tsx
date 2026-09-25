@@ -1,6 +1,6 @@
-import { View, Image, FlatList, Dimensions, Pressable } from 'react-native';
+import { View, Image, FlatList, Dimensions, Pressable, RefreshControl } from 'react-native';
 import React, { useCallback, useState } from 'react';
-import { deletePhoto, getPhotoLibrary, resolveCloudPhotoFile, syncMissingCloudPhotos } from '../../../services/Photos/index';
+import { deletePhoto, getCachedPhotoLibrary, getMergedPhotoLibrary, resolvePhotoFile } from '../../../services/Photos/index';
 import { StoredPhoto } from '../../../localStorage';
 import { useAuthStore } from '../../../store/auth.store';
 import { Screen } from '../../../components/commonStyles/styles';
@@ -20,35 +20,48 @@ const Photos = () => {
   const [allPhotos, setAllPhotos] = useState<StoredPhoto[]>([]);
   const [selectedPhoto, setselectedPhoto] = useState<StoredPhoto | null>(null);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const userId = useAuthStore(state => state.user?._id);
 
-  const getPhotoIds = useCallback(async () => {
+  const resolvePhotoRows = useCallback(async (photos: StoredPhoto[]) => {
+    const resolved = await Promise.all(photos.map(async photo => ({
+      ...photo,
+      location: await resolvePhotoFile(photo, 'thumbnail').catch(() => photo.location),
+    })));
+    return resolved.filter(photo => Boolean(photo.location));
+  }, []);
+
+  const loadPhotos = useCallback(async (options: { forceRemote?: boolean } = {}) => {
     if (!userId) {
       setIsLoadingPhotos(false);
       return;
     }
 
-    setIsLoadingPhotos(true);
+    if (!options.forceRemote) setIsLoadingPhotos(true);
     try {
-      const cloud = await getPhotoLibrary();
-      await syncMissingCloudPhotos(cloud);
-      setAllPhotos(await Promise.all(cloud.map(async photo => ({
-        id: photo.photoId,
-        name: `${photo.photoId}.jpg`,
-        location: await resolveCloudPhotoFile(photo, 'thumbnail'),
-        mimeType: photo.variants.thumbnail.mimeType,
-        date: photo.capturedAt,
-        cloudPhoto: photo,
-      }))));
+      if (!options.forceRemote) {
+        const cached = await resolvePhotoRows(await getCachedPhotoLibrary());
+        setAllPhotos(cached);
+      }
+
+      const photos = await getMergedPhotoLibrary({ forceRemote: options.forceRemote });
+      const resolved = await resolvePhotoRows(photos);
+      setAllPhotos(resolved);
     } finally {
       setIsLoadingPhotos(false);
+      setIsRefreshing(false);
     }
-  }, [userId]);
+  }, [resolvePhotoRows, userId]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadPhotos({ forceRemote: true });
+  }, [loadPhotos]);
 
   useFocusEffect(
     useCallback(() => {
-      getPhotoIds();
-    }, [getPhotoIds]),
+      loadPhotos();
+    }, [loadPhotos]),
   );
 
   return (
@@ -68,11 +81,13 @@ const Photos = () => {
             gap: 8,
             marginBottom: 8,
           }}
+          refreshControl={(
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          )}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <Pressable onPress={async () => {
-              const cloudPhoto = item.cloudPhoto;
-              const standardLocation = cloudPhoto ? await resolveCloudPhotoFile(cloudPhoto as any, 'standard') : item.location;
+              const standardLocation = await resolvePhotoFile(item, 'standard').catch(() => item.location);
               setselectedPhoto({ ...item, standardLocation });
             }}>
               <View style={{ width: IMAGE_SIZE, aspectRatio: 1 }}>
@@ -103,7 +118,6 @@ const Photos = () => {
           visible={true}
           onClose={() => setselectedPhoto(null)}
           selectedPhoto={selectedPhoto}
-          userId={userId!}
           onDelete={async () => {
             await deletePhoto(selectedPhoto.id);
             setAllPhotos(current => current.filter(photo => photo.id !== selectedPhoto.id));

@@ -25,13 +25,12 @@ import {
   TabButtonText,
   Tabs,
 } from './styles';
-import { getPhotoDetails } from '../../../services/Photos/index';
+import { type CloudPhoto } from '../../../services/Photos/index';
 import { PlotNote, normalizeContent } from '../Projects/ProjectNoteDetails/helpers';
 import LoadingState from '../../../components/LoadingState';
 
 interface PhotosModelProps extends MyModalProps {
   selectedPhoto: StoredPhoto;
-  userId: string;
   onDelete?: () => Promise<void>;
 }
 
@@ -56,7 +55,6 @@ const PhotosModel = ({
   visible,
   onClose,
   selectedPhoto,
-  userId,
   onDelete,
 }: PhotosModelProps) => {
   const [selectedTab, setselectedTab] = useState('plotDetails');
@@ -79,17 +77,38 @@ const PhotosModel = ({
   const initialPinchDistance = React.useRef(0);
 
   React.useEffect(() => {
-    const loadPhotoDetails = async () => {
-      setIsLoadingDetails(true);
-      const res = await getPhotoDetails(selectedPhoto.id, userId);
-      if (res.status === 200) {
-        setphotoDetails(res.data);
-      }
-      setIsLoadingDetails(false);
-    };
+    const cloudPhoto = selectedPhoto.cloudPhoto as CloudPhoto | undefined;
+    const notePreview = cloudPhoto?.notePreview;
+    const now = selectedPhoto.date || new Date().toISOString();
 
-    loadPhotoDetails();
-  }, [selectedPhoto, userId]);
+    if (__DEV__) {
+      console.log('[PhotoCache] detail loaded locally', {
+        photoId: selectedPhoto.id,
+        hasCloudMetadata: Boolean(cloudPhoto),
+        projectId: selectedPhoto.projectId || cloudPhoto?.projectId,
+        plotId: selectedPhoto.plotId || cloudPhoto?.plotId,
+        noteId: selectedPhoto.noteId ?? cloudPhoto?.noteId,
+      });
+    }
+
+    setphotoDetails({
+      _id: selectedPhoto.noteId || cloudPhoto?.noteId || selectedPhoto.id,
+      projectId: selectedPhoto.projectId || cloudPhoto?.projectId || '',
+      plotId: selectedPhoto.plotId || cloudPhoto?.plotId || '',
+      content: notePreview ? [{ note: [notePreview], photoIds: [selectedPhoto.id] }] : [],
+      userId: '',
+      createdAt: now,
+      updatedAt: now,
+      title: cloudPhoto?.plotTitle || selectedPhoto.plotId || 'Unknown plot',
+      replication: cloudPhoto?.replication || 0,
+      treatment: cloudPhoto?.treatment || 0,
+      replicationName: cloudPhoto?.replicationName || undefined,
+      treatmentName: cloudPhoto?.treatmentName || undefined,
+      __v: 0,
+      ProjectTitle: cloudPhoto?.projectTitle || selectedPhoto.projectId || 'Unknown project',
+    });
+    setIsLoadingDetails(false);
+  }, [selectedPhoto]);
 
   React.useEffect(() => {
     Image.getSize(
